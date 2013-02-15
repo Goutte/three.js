@@ -1,16 +1,25 @@
 /**
  * Plugin for THREE.WebGLRenderer, to add as pre-plugin.
  *
- * Renders a background color or texture.
+ * Renders a background skymap behind the Scene
  * This aims to solve the problem of the camera's far constraint
  *
- * fixme THIS IS A WORK IN PROGRESS
+ * ¡ THIS IS A WORK IN PROGRESS !
  *
  * Usage example :
  * renderer.addPrePlugin(new THREE.SkySpherePlugin({
- *   mode: 'staticImage'
+ *   mode: 'sphereImage',
+ *   sphereImage: {
+ *     imageSrc: 'textures/skymap/apocalyptic_room.jpg'
+ *   }
  * }));
  *
+ * Modes :
+ *
+ * - test : don't mind it, it should draw a big static polychromatic triangle behind the scene
+ * - staticImage : draws a static image directly using shader (no modifications to the scene)
+ * - sphereImage : adds a big SphereGeometrized mesh following the camera, of frustum's farthest plan radius,
+ *                 and textured the way you want.
  *
  * Notes :
  *
@@ -18,15 +27,15 @@
  * Powers of 2 : 1 2 4 8 16 32 64 128 256 1024 2048 4096 8192 16384 32768 65536
  *
  * The sphereImage mode adds a big mesh with a sphere geometry.
- * Ideally, it should not add anything to the scene, and render directly ; I spent some time trying, but to no avail.
+ * Ideally, it should not add anything to the scene, and render directly using shaders ; I spent a night trying, but to no avail.
  *
- * The Sphere UV mapping does not fill the image rectangle, which causes artifacts on poles.
- * Using an icosahedron with a mapping similar to textures/skymap/example_ico_uv.jpg would be better
- *
- *
- * @param {Object} options Optional, see defaultOptions below
+ * The current THREE.SphereGeometry UV mapping does not fill the image rectangle, which causes artifacts on poles on continuus textures.
+ * Using an Icosahedron with a mapping similar to textures/skymap/example_ico_uv.jpg would probably be prettier.
+ * Quadspheres are nice too.
  *
  * @author Goutte / http://github.com/Goutte
+ *
+ * @param {Object} options Optional, see defaultOptions below
  */
 THREE.SkySpherePlugin = function ( options ) {
 
@@ -41,7 +50,7 @@ THREE.SkySpherePlugin = function ( options ) {
       radiusIfCameraHasNoFar: 1000,
       materialOptions: {}
     },
-    onLoad: function(){} // callback fired when images are loaded fixme: not implemented
+    onLoad: function(){} // callback fired when images are loaded (¡ `this` may be anything !)
   };
 
   options = options || {};
@@ -65,21 +74,18 @@ THREE.SkySpherePlugin = function ( options ) {
     _renderer = renderer;
     _precision = renderer.getPrecision();
 
-    if ( this.shaders[options.mode] !== undefined ) {
-      _program = createProgram( this.shaders[options.mode]['vertex'], this.shaders[options.mode]['fragment'] );
-      _gl.useProgram( _program );
-    }
-
     switch ( options.mode )
     {
       case 'test':
-        _renderer.autoClear = false;
+        _renderer.autoClear = false; // otherwise it clears between the pre plugins and the scene
         break;
 
 
       case 'staticImage':
 
-        _renderer.autoClear = false;
+        this.createProgramForMode(options.mode);
+
+        _renderer.autoClear = false; // otherwise it clears between the pre plugins and the scene
 
         function handleLoadedTexture( texture ) {
           _gl.bindTexture( _gl.TEXTURE_2D, texture );
@@ -90,6 +96,7 @@ THREE.SkySpherePlugin = function ( options ) {
           _gl.bindTexture( _gl.TEXTURE_2D, null );
 
           _isTextureLoaded = true;
+          options.onLoad();
         }
 
         _skyTexture = _gl.createTexture();
@@ -106,11 +113,18 @@ THREE.SkySpherePlugin = function ( options ) {
         break;
 
       default:
-        break;
+        throw new Error("SkySphere has no '"+options.mode+"' mode");
     }
 
+  };
 
-
+  this.createProgramForMode = function(mode) {
+    if ( this.shaders[mode] !== undefined ) {
+      _program = createProgram( this.shaders[options.mode]['vertex'], this.shaders[options.mode]['fragment'] );
+      _gl.useProgram( _program );
+    } else {
+      throw new Error("No GLSL shaders for mode '"+mode+"'");
+    }
   };
 
 
@@ -141,7 +155,7 @@ THREE.SkySpherePlugin = function ( options ) {
         break;
 
       default:
-        throw new Error('SkySphere has no '+options.mode+' mode');
+        throw new Error("SkySphere has no '"+options.mode+"' mode");
     }
 
   };
@@ -221,6 +235,14 @@ THREE.SkySpherePlugin = function ( options ) {
 
   this.initSphereImage = function ( renderer ) {};
 
+  /**
+   * Obvious problem : if camera.far changes after initialization, we're screwed
+   *
+   * @param {THREE.Scene}  scene
+   * @param {THREE.Camera} camera
+   * @param viewportWidth
+   * @param viewportHeight
+   */
   this.renderSphereImage = function ( scene, camera, viewportWidth, viewportHeight ) {
 
     if ( ! _sphereImageInitialized ) {
@@ -233,10 +255,13 @@ THREE.SkySpherePlugin = function ( options ) {
       var materialOptions = options.sphereImage.materialOptions || {};
 
       if ( ! materialOptions.map ) {
-        materialOptions.map = THREE.ImageUtils.loadTexture( options.sphereImage.imageSrc );
+        materialOptions.map = THREE.ImageUtils.loadTexture( options.sphereImage.imageSrc, new THREE.UVMapping(), options.onLoad );
       }
 
-      _skyMesh = new THREE.Mesh( new THREE.SphereGeometry( radius, 8 * detail, 6 * detail ), new THREE.MeshBasicMaterial( materialOptions ) );
+      _skyMesh = new THREE.Mesh(
+        new THREE.SphereGeometry( radius, 8 * detail, 6 * detail ),
+        new THREE.MeshBasicMaterial( materialOptions )
+      );
       _skyMesh.scale.x = -1; // will show material inside of geometry
       _skyMesh.frustumCulled = false;
 
@@ -244,7 +269,9 @@ THREE.SkySpherePlugin = function ( options ) {
 
     }
 
-    _skyMesh.position = camera.position; // make sure the skysphere does not move relatively to the camera
+    if (camera.position instanceof THREE.Vector3) {
+      _skyMesh.position = camera.position; // make sure the skysphere does not translate in the camera's referential
+    }
 
   };
 
@@ -295,7 +322,7 @@ THREE.SkySpherePlugin = function ( options ) {
   /**
    * GLSL Shaders for each mode
    * We HAVE GOT to find another way to host these
-   * Separate files would be good but would require waiting for them to load => doable, i think
+   * Separate files would be nice but would require waiting for them to load => doable, but may be too expensive
    *
    * @type {Object}
    */
@@ -352,22 +379,29 @@ THREE.SkySpherePlugin = function ( options ) {
 
   // TODO: find the THREE utils that manage this, to dry the code up
 
-  function mergeObjects( obj1, obj2 ) {
-    for ( var p in obj2 ) {
+  /**
+   * Merge addedObject into destinationObject and return the latter
+   * fixme: https://github.com/mootools/mootools-core/blob/master/Source/Core/Core.js#L362
+   *
+   * @param destinationObject
+   * @param addedObject
+   * @return {*}
+   */
+  function mergeObjects( destinationObject, addedObject ) {
+    for ( var p in addedObject ) {
       try {
-        // Property in destination object set; update its value.
-        if ( obj2[p].constructor == Object ) {
-          obj1[p] = mergeObjects( obj1[p], obj2[p] );
+        // Property in destinationObject set; update its value.
+        if ( addedObject[p].constructor == Object ) {
+          destinationObject[p] = mergeObjects( destinationObject[p], addedObject[p] );
         } else {
-          obj1[p] = obj2[p];
+          destinationObject[p] = addedObject[p];
         }
       } catch ( e ) {
-        // Property in destination object not set; create it and set its value.
-        obj1[p] = obj2[p];
+        destinationObject[p] = addedObject[p]; // Property in destinationObject not set; create it and set its value.
       }
     }
 
-    return obj1;
+    return destinationObject;
   }
 
   function createShader( str, type ) {
