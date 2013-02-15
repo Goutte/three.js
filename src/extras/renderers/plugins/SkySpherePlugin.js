@@ -4,13 +4,36 @@
  * @author Goutte / http://github.com/Goutte
  */
 
-THREE.SkySpherePlugin = function () {
+THREE.SkySpherePlugin = function (options) {
+  
+  options = options || {};
+  options = mergeObjects(options,{
+    shader: 'texture'
+  });
 
+  function mergeObjects(obj1, obj2) {
+    for (var p in obj2) {
+      try {
+        // Property in destination object set; update its value.
+        if ( obj2[p].constructor == Object ) {
+          obj1[p] = mergeObjects(obj1[p], obj2[p]);
+        } else {
+          obj1[p] = obj2[p];
+        }
+      } catch(e) {
+        // Property in destination object not set; create it and set its value.
+        obj1[p] = obj2[p];
+      }
+    }
+
+    return obj1;
+  }
+  
   var mapperFunction = function ( theta, phi ) {
     return 0xFF3399;
   };
 
-  var _gl, _renderer, _precision, _lensFlare = {};
+  var _gl, _renderer, _precision, _program, _skyTexture;
 
   this.init = function ( renderer ) {
 
@@ -20,6 +43,26 @@ THREE.SkySpherePlugin = function () {
 
 
     console.log( "_GL", _gl );
+
+    
+    if (this.shaders[options.shader] === undefined) throw new Error('Shader '+options.shader+' is not defined.');
+
+    _program = createProgram( this.shaders[options.shader]['vertex'], this.shaders[options.shader]['fragment'] );
+    _gl.useProgram( _program );
+
+    console.log( "_program", _program );
+
+
+    _skyTexture = _gl.createTexture();
+    _skyTexture.image = new Image();
+    _skyTexture.image.onload = function() { handleLoadedTexture(_skyTexture) };
+    _skyTexture.image.src = "textures/skymap/sky02.jpg";
+//    _skyTexture.image.src = "textures/skymap/nehe.gif";
+
+
+
+
+
 
 //    _gl.clearColor( 1, 1, 1, 1 );
 //    _gl.enable( _gl.BLEND );
@@ -44,12 +87,258 @@ THREE.SkySpherePlugin = function () {
 
   };
 
+  this.shaders = {
+    'test': {
+      'vertex': [
+         'attribute vec2 aPosition;'
+        ,'attribute vec4 aColor;'
+
+        ,'varying   vec4 vColor;'
+
+        ,'void main(){'
+        ,'  gl_Position = vec4(aPosition, 1.0, 1.0);'
+        ,'  vColor = aColor;'
+        ,'}'
+      ].join( "\n" ),
+      'fragment': [
+         'precision mediump float;'
+
+        ,'varying   vec4 vColor;'
+
+        ,'void main(){'
+        ,'  gl_FragColor = vColor;'
+        ,'}'
+      ].join( "\n" )
+    },
+
+    'texture': {
+      'vertex': [
+         'attribute vec2 aPosition;'
+        ,'attribute vec2 aTextureUV;'
+
+        ,'varying   vec2 vTextureUV;'
+
+        ,'void main(){'
+        ,'  gl_Position = vec4(aPosition, 1.0, 1.0);'
+        ,'  vTextureUV = aTextureUV;'
+        ,'}'
+      ].join( "\n" ),
+      'fragment': [
+         'precision mediump   float;'
+
+        ,'uniform   sampler2D uSampler;'
+
+        ,'varying   vec2      vTextureUV;'
+
+        ,'void main(){'
+        ,'  gl_FragColor = texture2D(uSampler, vTextureUV);'
+        ,'}'
+      ].join( "\n" )
+    }
+  };
+
 
   this.render = function ( scene, camera, viewportWidth, viewportHeight ) {
 
+    _gl.useProgram(_program);
 
-//    _renderer.setDepthTest( true );
-//    _renderer.setDepthWrite( true );
+    switch (options.shader)
+    {
+      case 'test':
+        this.renderTest(scene, camera, viewportWidth, viewportHeight);
+        break;
+
+      case 'texture':
+      default:
+        this.renderTexture(scene, camera, viewportWidth, viewportHeight);
+        break;
+    }
+
+  };
+  
+  function handleLoadedTexture(texture) {
+    _gl.bindTexture(_gl.TEXTURE_2D, texture);
+    _gl.pixelStorei(_gl.UNPACK_FLIP_Y_WEBGL, true);
+    _gl.texImage2D(_gl.TEXTURE_2D, 0, _gl.RGBA, _gl.RGBA, _gl.UNSIGNED_BYTE, texture.image);
+    _gl.texParameteri(_gl.TEXTURE_2D, _gl.TEXTURE_MAG_FILTER, _gl.NEAREST);
+    _gl.texParameteri(_gl.TEXTURE_2D, _gl.TEXTURE_MIN_FILTER, _gl.NEAREST);
+    _gl.bindTexture(_gl.TEXTURE_2D, null);
+  }
+
+  this.renderTexture = function ( scene, camera, viewportWidth, viewportHeight ) {
+
+    var cubeVertexPositionBuffer = _gl.createBuffer();
+    _gl.bindBuffer( _gl.ARRAY_BUFFER, cubeVertexPositionBuffer );
+//    var vertices = [
+//      // Front face
+//      -1.0, -1.0, 1.0,
+//      1.0, -1.0, 1.0,
+//      1.0, 1.0, 1.0,
+//      -1.0, 1.0, 1.0,
+//
+//      // Back face
+//      -1.0, -1.0, -1.0,
+//      -1.0, 1.0, -1.0,
+//      1.0, 1.0, -1.0,
+//      1.0, -1.0, -1.0,
+//
+//      // Top face
+//      -1.0, 1.0, -1.0,
+//      -1.0, 1.0, 1.0,
+//      1.0, 1.0, 1.0,
+//      1.0, 1.0, -1.0,
+//
+//      // Bottom face
+//      -1.0, -1.0, -1.0,
+//      1.0, -1.0, -1.0,
+//      1.0, -1.0, 1.0,
+//      -1.0, -1.0, 1.0,
+//
+//      // Right face
+//      1.0, -1.0, -1.0,
+//      1.0, 1.0, -1.0,
+//      1.0, 1.0, 1.0,
+//      1.0, -1.0, 1.0,
+//
+//      // Left face
+//      -1.0, -1.0, -1.0,
+//      -1.0, -1.0, 1.0,
+//      -1.0, 1.0, 1.0,
+//      -1.0, 1.0, -1.0
+//    ];
+
+    var vertices = [
+      -1.0, -1.0,
+       1.0,  1.0,
+      -1.0,  1.0,
+      -1.0, -1.0,
+       1.0, -1.0,
+       1.0,  1.0,
+    ];
+    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( vertices ), _gl.STATIC_DRAW );
+    cubeVertexPositionBuffer.itemSize = 2;
+    cubeVertexPositionBuffer.numItems = vertices.length / cubeVertexPositionBuffer.itemSize;
+
+
+
+    var cubeVertexTextureUVsBuffer = _gl.createBuffer();
+    _gl.bindBuffer( _gl.ARRAY_BUFFER, cubeVertexTextureUVsBuffer );
+//    var textureUVs = [
+//      // Front face
+//      0.0, 0.0,
+//      1.0, 0.0,
+//      1.0, 1.0,
+//      0.0, 1.0,
+//
+//      // Back face
+//      1.0, 0.0,
+//      1.0, 1.0,
+//      0.0, 1.0,
+//      0.0, 0.0,
+//
+//      // Top face
+//      0.0, 1.0,
+//      0.0, 0.0,
+//      1.0, 0.0,
+//      1.0, 1.0,
+//
+//      // Bottom face
+//      1.0, 1.0,
+//      0.0, 1.0,
+//      0.0, 0.0,
+//      1.0, 0.0,
+//
+//      // Right face
+//      1.0, 0.0,
+//      1.0, 1.0,
+//      0.0, 1.0,
+//      0.0, 0.0,
+//
+//      // Left face
+//      0.0, 0.0,
+//      1.0, 0.0,
+//      1.0, 1.0,
+//      0.0, 1.0
+//    ];
+    var textureUVs = [
+       0.0,  1.0,
+       1.0,  0.0,
+       0.0,  0.0,
+       0.0,  1.0,
+       1.0,  1.0,
+       1.0,  0.0,
+    ];
+    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( textureUVs ), _gl.STATIC_DRAW );
+    cubeVertexTextureUVsBuffer.itemSize = 2;
+    cubeVertexTextureUVsBuffer.numItems = textureUVs.length / cubeVertexTextureUVsBuffer.itemSize;
+
+
+
+//    var cubeVertexIndexBuffer = _gl.createBuffer();
+//    _gl.bindBuffer( _gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer );
+//    var cubeVertexIndices = [
+//      0, 1, 2, 0, 2, 3, // Front face
+//      4, 5, 6, 4, 6, 7, // Back face
+//      8, 9, 10, 8, 10, 11, // Top face
+//      12, 13, 14, 12, 14, 15, // Bottom face
+//      16, 17, 18, 16, 18, 19, // Right face
+//      20, 21, 22, 20, 22, 23  // Left face
+//    ];
+//    _gl.bufferData( _gl.ELEMENT_ARRAY_BUFFER, new Uint16Array( cubeVertexIndices ), _gl.STATIC_DRAW );
+//    cubeVertexIndexBuffer.itemSize = 1;
+//    cubeVertexIndexBuffer.numItems = 36;
+
+
+    // init shaders
+    
+    _program.vertexPositionAttribute = _gl.getAttribLocation(_program, "aPosition");
+    _gl.enableVertexAttribArray(_program.vertexPositionAttribute);
+
+    _program.textureUVAttribute = _gl.getAttribLocation(_program, "aTextureUV");
+    _gl.enableVertexAttribArray(_program.textureUVAttribute);
+
+//    _program.pMatrixUniform = _gl.getUniformLocation(_program,  "uPMatrix");
+//    _program.mvMatrixUniform = _gl.getUniformLocation(_program, "uMVMatrix");
+    _program.samplerUniform = _gl.getUniformLocation(_program,  "uSampler");
+
+    //console.log("!",_program.samplerUniform);
+
+
+    // draw
+
+//    _gl.useProgram(_program);
+
+
+    _gl.bindBuffer(_gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
+    _gl.vertexAttribPointer(_program.vertexPositionAttribute, cubeVertexPositionBuffer.itemSize, _gl.FLOAT, false, 0, 0);
+
+    _gl.bindBuffer(_gl.ARRAY_BUFFER, cubeVertexTextureUVsBuffer);
+    _gl.vertexAttribPointer(_program.textureUVAttribute, cubeVertexTextureUVsBuffer.itemSize, _gl.FLOAT, false, 0, 0);
+
+    _gl.activeTexture(_gl.TEXTURE0);
+    _gl.bindTexture(_gl.TEXTURE_2D, _skyTexture);
+
+
+    _gl.uniform1i(_program.samplerUniform, 0);
+
+
+    _gl.bindBuffer(_gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
+    _gl.drawArrays(_gl.TRIANGLES, 0, cubeVertexPositionBuffer.numItems);
+
+    //_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer);
+    //setMatrixUniforms();
+    //_gl.drawElements(_gl.TRIANGLES, cubeVertexIndexBuffer.numItems, _gl.UNSIGNED_SHORT, 0);
+
+
+//    _gl.viewport(0, 0, _gl.viewportWidth, _gl.viewportHeight);
+//    _gl.clear(_gl.COLOR_BUFFER_BIT | _gl.DEPTH_BUFFER_BIT);
+
+
+  };
+
+
+  this.renderTest = function ( scene, camera, viewportWidth, viewportHeight ) {
+
 
 
     var vertices = [
@@ -73,230 +362,25 @@ THREE.SkySpherePlugin = function () {
     triangleVertexColorBuffer.itemSize = 4;
     triangleVertexColorBuffer.numItems = 3;
 
-    var vs = 'attribute vec2 pos; ' + "\n" +
-      'attribute vec4 color; ' + "\n" +
-      'varying vec4 vColor; ' + "\n" +
-      'void main() { gl_Position = vec4(pos, 1.0, 1); vColor = color; }';
-    var fs = 'precision mediump float; ' + "\n" +
-      'varying vec4 vColor; ' +
-      'void main() { gl_FragColor = vColor; }';
+    _program.vertexPosAttrib = _gl.getAttribLocation( _program, 'aPosition' );
+    _gl.enableVertexAttribArray( _program.vertexPosAttrib );
 
-    var program = createProgram( vs, fs );
-    _gl.useProgram( program );
-
-
-    program.vertexPosAttrib = _gl.getAttribLocation( program, 'pos' );
-    _gl.enableVertexAttribArray( program.vertexPosAttrib );
-
-    program.vertexColorAttrib = _gl.getAttribLocation( program, 'color' );
-    _gl.enableVertexAttribArray( program.vertexColorAttrib );
-
+    _program.vertexColorAttrib = _gl.getAttribLocation( _program, 'aColor' );
+    _gl.enableVertexAttribArray( _program.vertexColorAttrib );
 
     _gl.bindBuffer( _gl.ARRAY_BUFFER, vertexPosBuffer );
-    _gl.vertexAttribPointer( program.vertexPosAttrib, 2, _gl.FLOAT, false, 0, 0 );
+    _gl.vertexAttribPointer( _program.vertexPosAttrib, 2, _gl.FLOAT, false, 0, 0 );
 
     _gl.bindBuffer( _gl.ARRAY_BUFFER, triangleVertexColorBuffer );
-    _gl.vertexAttribPointer( program.vertexColorAttrib, triangleVertexColorBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
+    _gl.vertexAttribPointer( _program.vertexColorAttrib, triangleVertexColorBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
 
     _gl.drawArrays( _gl.TRIANGLES, 0, 3 );
 
-
-//		var flares = scene.__webglFlares,
-//			nFlares = flares.length;
-
-//		if ( ! nFlares ) return;
-
-//    console.log("scene",scene,"cam",camera,viewportWidth, viewportHeight);
-
-//		var tempPosition = new THREE.Vector3();
-//
-//		var invAspect = viewportHeight / viewportWidth,
-//			halfViewportWidth = viewportWidth * 0.5,
-//			halfViewportHeight = viewportHeight * 0.5;
-//
-//		var size = 16 / viewportHeight,
-//			scale = new THREE.Vector2( size * invAspect, size );
-//
-//		var screenPosition = new THREE.Vector3( 1, 1, 0 ),
-//			screenPositionPixels = new THREE.Vector2( 1, 1 );
-
-//		var uniforms = _lensFlare.uniforms,
-//			attributes = _lensFlare.attributes;
-//
-//		// set _lensFlare program and reset blending
-//
-//		_gl.useProgram( _lensFlare.program );
-//
-//		_gl.enableVertexAttribArray( _lensFlare.attributes.vertex );
-//		_gl.enableVertexAttribArray( _lensFlare.attributes.uv );
-//
-//		// loop through all lens flares to update their occlusion and positions
-//		// setup gl and common used attribs/unforms
-//
-//		_gl.uniform1i( uniforms.occlusionMap, 0 );
-//		_gl.uniform1i( uniforms.map, 1 );
-//
-//		_gl.bindBuffer( _gl.ARRAY_BUFFER, _lensFlare.vertexBuffer );
-//		_gl.vertexAttribPointer( attributes.vertex, 2, _gl.FLOAT, false, 2 * 8, 0 );
-//		_gl.vertexAttribPointer( attributes.uv, 2, _gl.FLOAT, false, 2 * 8, 8 );
-//
-//		_gl.bindBuffer( _gl.ELEMENT_ARRAY_BUFFER, _lensFlare.elementBuffer );
-//
-//		_gl.disable( _gl.CULL_FACE );
-//		_gl.depthMask( false );
-
-//		var i, j, jl, flare, sprite;
-//
-//		for ( i = 0; i < nFlares; i ++ ) {
-//
-//			size = 16 / viewportHeight;
-//			scale.set( size * invAspect, size );
-//
-//			// calc object screen position
-//
-//			flare = flares[ i ];
-//
-//			tempPosition.set( flare.matrixWorld.elements[12], flare.matrixWorld.elements[13], flare.matrixWorld.elements[14] );
-//
-//			tempPosition.applyMatrix4( camera.matrixWorldInverse );
-//			tempPosition.applyProjection( camera.projectionMatrix );
-//
-//			// setup arrays for gl programs
-//
-//			screenPosition.copy( tempPosition )
-//
-//			screenPositionPixels.x = screenPosition.x * halfViewportWidth + halfViewportWidth;
-//			screenPositionPixels.y = screenPosition.y * halfViewportHeight + halfViewportHeight;
-//
-//			// screen cull
-//
-//			if ( _lensFlare.hasVertexTexture || (
-//				screenPositionPixels.x > 0 &&
-//				screenPositionPixels.x < viewportWidth &&
-//				screenPositionPixels.y > 0 &&
-//				screenPositionPixels.y < viewportHeight ) ) {
-//
-//				// save current RGB to temp texture
-//
-//				_gl.activeTexture( _gl.TEXTURE1 );
-//				_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.tempTexture );
-//				_gl.copyTexImage2D( _gl.TEXTURE_2D, 0, _gl.RGB, screenPositionPixels.x - 8, screenPositionPixels.y - 8, 16, 16, 0 );
-//
-//
-//				// render pink quad
-//
-//				_gl.uniform1i( uniforms.renderType, 0 );
-//				_gl.uniform2f( uniforms.scale, scale.x, scale.y );
-//				_gl.uniform3f( uniforms.screenPosition, screenPosition.x, screenPosition.y, screenPosition.z );
-//
-//				_gl.disable( _gl.BLEND );
-//				_gl.enable( _gl.DEPTH_TEST );
-//
-//				_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
-//
-//
-//				// copy result to occlusionMap
-//
-//				_gl.activeTexture( _gl.TEXTURE0 );
-//				_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.occlusionTexture );
-//				_gl.copyTexImage2D( _gl.TEXTURE_2D, 0, _gl.RGBA, screenPositionPixels.x - 8, screenPositionPixels.y - 8, 16, 16, 0 );
-//
-//
-//				// restore graphics
-//
-//				_gl.uniform1i( uniforms.renderType, 1 );
-//				_gl.disable( _gl.DEPTH_TEST );
-//
-//				_gl.activeTexture( _gl.TEXTURE1 );
-//				_gl.bindTexture( _gl.TEXTURE_2D, _lensFlare.tempTexture );
-//				_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
-//
-//
-//				// update object positions
-//
-//				flare.positionScreen.copy( screenPosition )
-//
-//				if ( flare.customUpdateCallback ) {
-//
-//					flare.customUpdateCallback( flare );
-//
-//				} else {
-//
-//					flare.updateLensFlares();
-//
-//				}
-//
-//				// render flares
-//
-//				_gl.uniform1i( uniforms.renderType, 2 );
-//				_gl.enable( _gl.BLEND );
-//
-//				for ( j = 0, jl = flare.lensFlares.length; j < jl; j ++ ) {
-//
-//					sprite = flare.lensFlares[ j ];
-//
-//					if ( sprite.opacity > 0.001 && sprite.scale > 0.001 ) {
-//
-//						screenPosition.x = sprite.x;
-//						screenPosition.y = sprite.y;
-//						screenPosition.z = sprite.z;
-//
-//						size = sprite.size * sprite.scale / viewportHeight;
-//
-//						scale.x = size * invAspect;
-//						scale.y = size;
-//
-//						_gl.uniform3f( uniforms.screenPosition, screenPosition.x, screenPosition.y, screenPosition.z );
-//						_gl.uniform2f( uniforms.scale, scale.x, scale.y );
-//						_gl.uniform1f( uniforms.rotation, sprite.rotation );
-//
-//						_gl.uniform1f( uniforms.opacity, sprite.opacity );
-//						_gl.uniform3f( uniforms.color, sprite.color.r, sprite.color.g, sprite.color.b );
-//
-//						_renderer.setBlending( sprite.blending, sprite.blendEquation, sprite.blendSrc, sprite.blendDst );
-//						_renderer.setTexture( sprite.texture, 1 );
-//
-//						_gl.drawElements( _gl.TRIANGLES, 6, _gl.UNSIGNED_SHORT, 0 );
-//
-//					}
-//
-//				}
-//
-//			}
-//
-//		}
-//
-//		// restore gl
-//
-//		_gl.enable( _gl.CULL_FACE );
-//		_gl.enable( _gl.DEPTH_TEST );
-//		_gl.depthMask( true );
-
   };
 
-//	function createProgram ( shader, precision ) {
-//
-//		var program = _gl.createProgram();
-//
-//		var fragmentShader = _gl.createShader( _gl.FRAGMENT_SHADER );
-//		var vertexShader = _gl.createShader( _gl.VERTEX_SHADER );
-//
-//		var prefix = "precision " + precision + " float;\n";
-//
-//		_gl.shaderSource( fragmentShader, prefix + shader.fragmentShader );
-//		_gl.shaderSource( vertexShader, prefix + shader.vertexShader );
-//
-//		_gl.compileShader( fragmentShader );
-//		_gl.compileShader( vertexShader );
-//
-//		_gl.attachShader( program, fragmentShader );
-//		_gl.attachShader( program, vertexShader );
-//
-//		_gl.linkProgram( program );
-//
-//		return program;
-//
-//	};
+
+
+  // TODO: find the THREE util that manages this, to dry the code up
 
   function createShader( str, type ) {
     var shader = _gl.createShader( type );
@@ -320,5 +404,7 @@ THREE.SkySpherePlugin = function () {
     }
     return program;
   }
+
+  //////////////////////////////////////////////////////////////////
 
 };

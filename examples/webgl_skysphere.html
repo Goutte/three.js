@@ -29,7 +29,7 @@
 			#stats { position: absolute; top:0; left: 0 }
 			#stats #fps { background: transparent !important }
 			#stats #fps #fpsText { color: #777 !important }
-			#stats #fps #fpsGraph { display: none }
+			/*#stats #fps #fpsGraph { display: none }*/
 		</style>
 	</head>
 
@@ -51,51 +51,7 @@
 
 		<script src="fonts/helvetiker_bold.typeface.js"></script>
 
-		<script type="x-shader/x-vertex" id="vertexshader">
-
-			uniform float amplitude;
-
-			attribute vec3 customColor;
-			attribute vec3 displacement;
-
-			varying vec3 vNormal;
-			varying vec3 vColor;
-
-			void main() {
-
-				vNormal = normal;
-				vColor = customColor;
-
-				vec3 newPosition = position + amplitude * displacement;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
-
-			}
-
-		</script>
-
-		<script type="x-shader/x-fragment" id="fragmentshader">
-
-			varying vec3 vNormal;
-			varying vec3 vColor;
-
-			void main() {
-
-				const float ambient = 0.005;
-
-				vec3 light = vec3( 1.0 );
-				light = normalize( light );
-
-				float directional = max( dot( vNormal, light ), 0.0 );
-
-				gl_FragColor = vec4( ( directional + ambient ) * vColor, 1.0 );
-				gl_FragColor.xyz = sqrt( gl_FragColor.xyz );
-
-			}
-
-		</script>
-
-
-		<script>
+		<script type="text/javascript">
 
 		if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
@@ -176,13 +132,13 @@
 //			var explodeModifier = new THREE.ExplodeModifier();
 //			explodeModifier.modify( geometry );
 
-			var vertices = geometry.vertices;
+//			var vertices = geometry.vertices;
 
 //			var colors = attributes.customColor.value;
 //			var displacement = attributes.displacement.value;
 
-			var h, d, x, y, z;
-			var nv, v = 0;
+//			var h, d, x, y, z;
+//			var nv, v = 0;
 
 //			for( var f = 0; f < geometry.faces.length; f ++ ) {
 //
@@ -225,22 +181,23 @@
 
 			console.log( "faces", geometry.faces.length );
 
-			mesh = new THREE.Mesh( geometry/*, shaderMaterial*/ );
-//			mesh.rotation.set( 0.5, 0.5, 0 );
-
-			scene.add( mesh );
+      mesh = new THREE.Mesh( geometry );
+      scene.add( mesh );
 
 			renderer = new THREE.WebGLRenderer( {
 			/*clearColor: 0x050505, clearAlpha: 1, antialias: true*/
-        //preserveDrawingBuffer: true
+//        preserveDrawingBuffer: true
+//        antialias: true
       } );
       //renderer.clear();
-//      renderer.setBlending(THREE.NoBlending);
+      //renderer.setBlending(THREE.NoBlending);
       renderer.autoClear = false;
 
 			renderer.setSize( WIDTH, HEIGHT );
 
       renderer.addPrePlugin(new THREE.SkySpherePlugin());
+
+
 
 			var container = document.getElementById( 'container' );
 			container.appendChild( renderer.domElement );
@@ -260,7 +217,6 @@
 			camera.updateProjectionMatrix();
 
 			renderer.setSize( window.innerWidth, window.innerHeight );
-
 
 		}
 
