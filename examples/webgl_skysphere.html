@@ -184,18 +184,11 @@
       mesh = new THREE.Mesh( geometry );
       scene.add( mesh );
 
-			renderer = new THREE.WebGLRenderer( {
-			/*clearColor: 0x050505, clearAlpha: 1, antialias: true*/
-//        preserveDrawingBuffer: true
-//        antialias: true
-      } );
-      //renderer.clear();
-      //renderer.setBlending(THREE.NoBlending);
-      renderer.autoClear = false;
+			renderer = new THREE.WebGLRenderer( {} );
 
 			renderer.setSize( WIDTH, HEIGHT );
 
-      renderer.addPrePlugin(new THREE.SkySpherePlugin());
+      renderer.addPrePlugin(new THREE.SkySpherePlugin({}));
 
 
 

@@ -72,7 +72,14 @@ THREE.SkySpherePlugin = function ( options ) {
 
     switch ( options.mode )
     {
+      case 'test':
+        _renderer.autoClear = false;
+        break;
+
+
       case 'staticImage':
+
+        _renderer.autoClear = false;
 
         function handleLoadedTexture( texture ) {
           _gl.bindTexture( _gl.TEXTURE_2D, texture );
@@ -88,7 +95,7 @@ THREE.SkySpherePlugin = function ( options ) {
         _skyTexture = _gl.createTexture();
         _skyTexture.image = new Image();
         _skyTexture.image.onload = function () { handleLoadedTexture( _skyTexture ) };
-        _skyTexture.image.src = options.imageSrc;
+        _skyTexture.image.src = options.staticImage.imageSrc;
 
         this.initStaticImage();
 
