@@ -11,7 +11,8 @@
  *   mode: 'staticImage'
  * }));
  *
- * Powers of 2 : 2 4 8 16 32 64 128 256 1024 2048 4096 8192 16384 32768 65536
+ * If using an image texture, its width and height must both be a power of 2.
+ * Powers of 2 : 1 2 4 8 16 32 64 128 256 1024 2048 4096 8192 16384 32768 65536
  *
  * @param {Object} options Optional, see defaultOptions below
  *
@@ -21,7 +22,7 @@
 THREE.SkySpherePlugin = function ( options ) {
 
   var defaultOptions = {
-    mode: 'staticImage', // test, uniformColor, staticImage
+    mode: 'sphereImage', // test, uniformColor, staticImage
     imageSrc: 'textures/skymap/sky00.jpg' // required by staticImage mode
   };
 
@@ -30,7 +31,8 @@ THREE.SkySpherePlugin = function ( options ) {
 
 
   var _gl, _renderer, _precision, _program,
-      _skyTexture, _isTextureLoaded = false;
+      _skyTexture, _isTextureLoaded = false,
+      _frustum, _projScreenMatrix;
 
 
   /**
@@ -48,7 +50,7 @@ THREE.SkySpherePlugin = function ( options ) {
 
     console.log( "_GL", _gl );
 
-    if ( this.shaders[options.mode] === undefined ) throw new Error( 'Shader ' + options.mode + ' is not defined.' );
+    if ( this.shaders[options.mode] === undefined ) throw new Error( 'SkySphere has no ' + options.mode + ' mode' );
 
     _program = createProgram( this.shaders[options.mode]['vertex'], this.shaders[options.mode]['fragment'] );
     _gl.useProgram( _program );
@@ -79,6 +81,9 @@ THREE.SkySpherePlugin = function ( options ) {
       case 'staticImage':
         this.initStaticImage();
         break;
+      case 'sphereImage':
+        this.initSphereImage( renderer );
+        break;
       default:
         break;
     }
@@ -107,7 +112,7 @@ THREE.SkySpherePlugin = function ( options ) {
    * @return {Boolean}
    */
   this.isUsingTexture = function () {
-    return (options.mode == 'staticImage');
+    return (options.mode == 'staticImage' || options.mode == 'sphereImage');
   };
 
 
@@ -130,9 +135,15 @@ THREE.SkySpherePlugin = function ( options ) {
         break;
 
       case 'staticImage':
-      default:
         if (_isTextureLoaded) this.renderStaticImage( scene, camera, viewportWidth, viewportHeight );
         break;
+
+      case 'sphereImage':
+        if (_isTextureLoaded) this.renderSphereImage( scene, camera, viewportWidth, viewportHeight );
+        break;
+
+      default:
+        throw new Error('SkySphere has no '+options.mode+' mode');
     }
 
   };
@@ -149,7 +160,7 @@ THREE.SkySpherePlugin = function ( options ) {
       -1.0,  1.0,
       -1.0, -1.0,
        1.0, -1.0,
-       1.0,  1.0,
+       1.0,  1.0
     ];
     _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( vertices ), _gl.STATIC_DRAW );
     _program.vertexPositionBuffer.itemSize = 2;
@@ -164,7 +175,7 @@ THREE.SkySpherePlugin = function ( options ) {
       0.0, 0.0,
       0.0, 1.0,
       1.0, 1.0,
-      1.0, 0.0,
+      1.0, 0.0
     ];
     _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( UVs ), _gl.STATIC_DRAW );
     _program.vertexUVBuffer.itemSize = 2;
@@ -189,7 +200,6 @@ THREE.SkySpherePlugin = function ( options ) {
     _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexUVBuffer );
     _gl.vertexAttribPointer( _program.textureUVAttribute, _program.vertexUVBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
 
-
   };
 
 
@@ -202,23 +212,142 @@ THREE.SkySpherePlugin = function ( options ) {
     _gl.vertexAttribPointer( _program.textureUVAttribute, _program.vertexUVBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
 
 
-
     _gl.activeTexture( _gl.TEXTURE0 );
     _gl.bindTexture( _gl.TEXTURE_2D, _skyTexture );
     _gl.uniform1i( _program.samplerUniform, 0 );
 
-
     _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
     _gl.drawArrays( _gl.TRIANGLES, 0, _program.vertexPositionBuffer.numItems );
 
-    //_gl.bindBuffer(_gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer);
-    //setMatrixUniforms();
-    //_gl.drawElements(_gl.TRIANGLES, cubeVertexIndexBuffer.numItems, _gl.UNSIGNED_SHORT, 0);
+  };
+
+  // SPHERE IMAGE //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  var _meshTest;
+
+  this.initSphereImage = function ( renderer ) {
+
+    //THREE.SphereGeometry = function ( radius, widthSegments, heightSegments, phiStart, phiLength, thetaStart, thetaLength ) {
+
+    var sphereGeometry = new THREE.SphereGeometry();
+
+    _meshTest = new THREE.Mesh( new THREE.SphereGeometry( 500, 60, 40 ), new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'textures/2294472375_24a3b8ef46_o.jpg' ) } ) );
+    _meshTest.scale.x = -1;
+
+    console.log('sphere geometry',sphereGeometry);
+    console.log('sphere mesh',_meshTest);
 
 
-//    _gl.viewport(0, 0, _gl.viewportWidth, _gl.viewportHeight);
-//    _gl.clear(_gl.COLOR_BUFFER_BIT | _gl.DEPTH_BUFFER_BIT);
+    // frustum
+    _frustum = new THREE.Frustum();
+     // camera matrices cache
+    _projScreenMatrix = new THREE.Matrix4();
 
+
+
+
+    _program.vertexPositionBuffer = _gl.createBuffer();
+    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
+    var vertices = [
+      -1.0, -1.0,
+       1.0,  1.0,
+      -1.0,  1.0,
+      -1.0, -1.0,
+       1.0, -1.0,
+       1.0,  1.0
+    ];
+    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( vertices ), _gl.STATIC_DRAW );
+    _program.vertexPositionBuffer.itemSize = 2;
+    _program.vertexPositionBuffer.numItems = vertices.length / _program.vertexPositionBuffer.itemSize;
+
+
+    _program.vertexUVBuffer = _gl.createBuffer();
+    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexUVBuffer );
+    var UVs = [
+      0.0, 1.0,
+      1.0, 0.0,
+      0.0, 0.0,
+      0.0, 1.0,
+      1.0, 1.0,
+      1.0, 0.0
+    ];
+    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( UVs ), _gl.STATIC_DRAW );
+    _program.vertexUVBuffer.itemSize = 2;
+    _program.vertexUVBuffer.numItems = UVs.length / _program.vertexUVBuffer.itemSize;
+
+
+    // Bind shaders vars
+
+    _program.vertexPositionAttribute = _gl.getAttribLocation( _program, "aPosition" );
+    _gl.enableVertexAttribArray( _program.vertexPositionAttribute );
+
+    _program.textureUVAttribute = _gl.getAttribLocation( _program, "aTextureUV" );
+    _gl.enableVertexAttribArray( _program.textureUVAttribute );
+
+    _program.samplerUniform = _gl.getUniformLocation( _program, "uSampler" );
+
+
+
+    // /!\ duplicate
+    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
+    _gl.vertexAttribPointer( _program.vertexPositionAttribute, _program.vertexPositionBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
+    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexUVBuffer );
+    _gl.vertexAttribPointer( _program.textureUVAttribute, _program.vertexUVBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
+
+  };
+
+  // see webglrenderer2
+  function setupMatrices ( object, camera ) {
+
+    object._modelViewMatrix.multiplyMatrices( camera.matrixWorldInverse, object.matrixWorld );
+
+    object._normalMatrix.getInverse( object._modelViewMatrix );
+    object._normalMatrix.transpose();
+
+  }
+
+  var addedOnce = false;
+
+  this.renderSphereImage = function ( scene, camera, viewportWidth, viewportHeight ) {
+
+
+    _projScreenMatrix.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
+    _frustum.setFromMatrix( _projScreenMatrix );
+
+
+    var lights = scene.__lights;
+    var fog = scene.fog;
+
+    if (!addedOnce) {
+      addedOnce = true;
+
+      scene.add(_meshTest);
+
+    }
+
+//    _meshTest._modelViewMatrix = new THREE.Matrix4();
+//    _meshTest._normalMatrix = new THREE.Matrix3();
+//
+//    setupMatrices(_meshTest, camera);
+//
+//    _renderer.renderBufferDirect ( camera, lights, fog, _meshTest.material, _meshTest.geometry, _meshTest );
+
+//    _renderer.renderImmediateObject ( camera, lights, fog, _meshTest.material, _meshTest );
+
+
+    // /!\ duplicate
+//    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
+//    _gl.vertexAttribPointer( _program.vertexPositionAttribute, _program.vertexPositionBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
+//    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexUVBuffer );
+//    _gl.vertexAttribPointer( _program.textureUVAttribute, _program.vertexUVBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
+//
+//
+//    _gl.activeTexture( _gl.TEXTURE0 );
+//    _gl.bindTexture( _gl.TEXTURE_2D, _skyTexture );
+//    _gl.uniform1i( _program.samplerUniform, 0 );
+//
+//    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
+//    _gl.drawArrays( _gl.TRIANGLES, 0, _program.vertexPositionBuffer.numItems );
 
   };
 
@@ -298,6 +427,31 @@ THREE.SkySpherePlugin = function ( options ) {
     },
 
     'staticImage': {
+      'vertex': [
+        'attribute vec2 aPosition;'
+        , 'attribute vec2 aTextureUV;'
+
+        , 'varying   vec2 vTextureUV;'
+
+        , 'void main(){'
+        , '  gl_Position = vec4(aPosition, 1.0, 1.0);'
+        , '  vTextureUV = aTextureUV;'
+        , '}'
+      ].join( "\n" ),
+      'fragment': [
+        'precision mediump   float;'
+
+        , 'uniform   sampler2D uSampler;'
+
+        , 'varying   vec2      vTextureUV;'
+
+        , 'void main(){'
+        , '  gl_FragColor = texture2D(uSampler, vTextureUV);'
+        , '}'
+      ].join( "\n" )
+    },
+
+    'sphereImage': {
       'vertex': [
         'attribute vec2 aPosition;'
         , 'attribute vec2 aTextureUV;'
