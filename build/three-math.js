@@ -3,7 +3,7 @@
  * @author Larry Battle / http://bateru.com/news
  */
 
-var THREE = THREE || { REVISION: '56dev' };
+var THREE = THREE || { REVISION: '56' };
 
 self.console = self.console || {
 
@@ -18,53 +18,44 @@ self.console = self.console || {
 self.Int32Array = self.Int32Array || Array;
 self.Float32Array = self.Float32Array || Array;
 
-// Shims for "startsWith", "endsWith", and "trim" for browsers where this is not yet implemented
-// not sure we should have this, or at least not have it here
-
-// http://stackoverflow.com/questions/646628/javascript-startswith
-// http://stackoverflow.com/questions/498970/how-do-i-trim-a-string-in-javascript
-// http://wiki.ecmascript.org/doku.php?id=harmony%3astring_extras
-
-String.prototype.startsWith = String.prototype.startsWith || function ( str ) {
-
-	return this.slice( 0, str.length ) === str;
-
-};
-
-String.prototype.endsWith = String.prototype.endsWith || function ( str ) {
-
-	var t = String( str );
-	var index = this.lastIndexOf( t );
-	return ( -1 < index && index ) === (this.length - t.length);
-
-};
-
 String.prototype.trim = String.prototype.trim || function () {
 
 	return this.replace( /^\s+|\s+$/g, '' );
 
 };
 
-// based on http://stackoverflow.com/a/12317051
-THREE.extend = function ( target, other ) {
+// based on https://github.com/documentcloud/underscore/blob/bf657be243a075b5e72acc8a83e6f12a564d8f55/underscore.js#L767
+THREE.extend = function ( obj, source ) {
 
-	target = target || {};
+	// ECMAScript5 compatibility based on: http://www.nczonline.net/blog/2012/12/11/are-your-mixins-ecmascript-5-compatible/
+	if ( Object.keys ) {
 
-	for (var prop in other) {
+		var keys = Object.keys( source );
 
-		if ( typeof other[prop] === 'object' ) {
+		for (var i = 0, il = keys.length; i < il; i++) {
 
-			target[prop] = THREE.extend( target[prop], other[prop] );
+			var prop = keys[i];
+			Object.defineProperty( obj, prop, Object.getOwnPropertyDescriptor( source, prop ) );
 
-		} else {
+		}
 
-			target[prop] = other[prop];
+	} else {
+
+		var safeHasOwnProperty = {}.hasOwnProperty;
+
+		for ( var prop in source ) {
+
+			if ( safeHasOwnProperty.call( source, prop ) ) {
+
+				obj[prop] = source[prop];
+
+			}
 
 		}
 
 	}
 
-	return target;
+	return obj;
 
 };
 
@@ -88,7 +79,7 @@ THREE.extend = function ( target, other ) {
 
 	if ( window.requestAnimationFrame === undefined ) {
 
-		window.requestAnimationFrame = function ( callback, element ) {
+		window.requestAnimationFrame = function ( callback ) {
 
 			var currTime = Date.now(), timeToCall = Math.max( 0, 16 - ( currTime - lastTime ) );
 			var id = window.setTimeout( function() { callback( currTime + timeToCall ); }, timeToCall );
@@ -306,60 +297,38 @@ THREE.extend( THREE.Color.prototype, {
 
 	setHSV: function ( h, s, v ) {
 
-		// based on MochiKit implementation by Bob Ippolito
-		// h,s,v ranges are < 0.0 - 1.0 >
+		console.log( 'DEPRECATED: Color\'s .setHSV() will be removed. Use .setHSL( h, s, l ) instead.' );
+		return this.setHSL(h,s*v/((h=(2-s)*v)<1?h:2-h),h/2); // https://gist.github.com/xpansive/1337890
 
-		var i, f, p, q, t;
+	},
 
-		if ( v === 0 ) {
+	setHSL: function ( h, s, l ) {
 
-			this.r = this.g = this.b = 0;
+		// h,s,l ranges are in 0.0 - 1.0
+
+		if ( s === 0 ) {
+
+			this.r = this.g = this.b = l;
 
 		} else {
 
-			i = Math.floor( h * 6 );
-			f = ( h * 6 ) - i;
-			p = v * ( 1 - s );
-			q = v * ( 1 - ( s * f ) );
-			t = v * ( 1 - ( s * ( 1 - f ) ) );
+			var hue2rgb = function ( p, q, t ) {
 
-			if ( i === 0 ) {
+				if ( t < 0 ) t += 1;
+				if ( t > 1 ) t -= 1;
+				if ( t < 1 / 6 ) return p + ( q - p ) * 6 * t;
+				if ( t < 1 / 2 ) return q;
+				if ( t < 2 / 3 ) return p + ( q - p ) * 6 * ( 2 / 3 - t );
+				return p;
 
-				this.r = v;
-				this.g = t;
-				this.b = p;
+			};
 
-			} else if ( i === 1 ) {
+			var p = l <= 0.5 ? l * ( 1 + s ) : l + s - ( l * s );
+			var q = ( 2 * l ) - p;
 
-				this.r = q;
-				this.g = v;
-				this.b = p;
-
-			} else if ( i === 2 ) {
-
-				this.r = p;
-				this.g = v;
-				this.b = t;
-
-			} else if ( i === 3 ) {
-
-				this.r = p;
-				this.g = q;
-				this.b = v;
-
-			} else if ( i === 4 ) {
-
-				this.r = t;
-				this.g = p;
-				this.b = v;
-
-			} else if ( i === 5 ) {
-
-				this.r = v;
-				this.g = p;
-				this.b = q;
-
-			}
+			this.r = hue2rgb( q, p, h + 1 / 3 );
+			this.g = hue2rgb( q, p, h );
+			this.b = hue2rgb( q, p, h - 1 / 3 );
 
 		}
 
@@ -498,78 +467,70 @@ THREE.extend( THREE.Color.prototype, {
 
 	},
 
+	getHSL: function () {
+
+		var hsl = { h: 0, s: 0, l: 0 };
+
+		return function () {
+
+			// h,s,l ranges are in 0.0 - 1.0
+
+			var r = this.r, g = this.g, b = this.b;
+
+			var max = Math.max( r, g, b );
+			var min = Math.min( r, g, b );
+
+			var hue, saturation;
+			var lightness = ( min + max ) / 2.0;
+
+			if ( min === max ) {
+
+				hue = 0;
+				saturation = 0;
+
+			} else {
+
+				var delta = max - min;
+
+				saturation = lightness <= 0.5 ? delta / ( max + min ) : delta / ( 2 - max - min );
+
+				switch ( max ) {
+
+					case r: hue = ( g - b ) / delta + ( g < b ? 6 : 0 ); break;
+					case g: hue = ( b - r ) / delta + 2; break;
+					case b: hue = ( r - g ) / delta + 4; break;
+
+				}
+
+				hue /= 6;
+
+			}
+
+			hsl.h = hue;
+			hsl.s = saturation;
+			hsl.l = lightness;
+
+			return hsl;
+
+		};
+
+	}(),
+
 	getStyle: function () {
 
-		return 'rgb(' + ( ( this.r * 255 ) | 0 )  + ',' + ( ( this.g * 255 ) | 0 ) + ',' + ( ( this.b * 255 ) | 0 ) + ')';
+		return 'rgb(' + ( ( this.r * 255 ) | 0 ) + ',' + ( ( this.g * 255 ) | 0 ) + ',' + ( ( this.b * 255 ) | 0 ) + ')';
 
 	},
 
-	getHSV: function ( hsv ) {
+	offsetHSL: function ( h, s, l ) {
 
-		// based on MochiKit implementation by Bob Ippolito
-		// h,s,v ranges are < 0.0 - 1.0 >
+		var hsl = this.getHSL();
 
-		var r = this.r;
-		var g = this.g;
-		var b = this.b;
+		hsl.h += h; hsl.s += s; hsl.l += l;
 
-		var max = Math.max( Math.max( r, g ), b );
-		var min = Math.min( Math.min( r, g ), b );
+		this.setHSL( hsl.h, hsl.s, hsl.l );
 
-		var hue;
-		var saturation;
-		var value = max;
-
-		if ( min === max )	{
-
-			hue = 0;
-			saturation = 0;
-
-		} else {
-
-			var delta = ( max - min );
-			saturation = delta / max;
-
-			if ( r === max ) {
-
-				hue = ( g - b ) / delta;
-
-			} else if ( g === max ) {
-
-				hue = 2 + ( ( b - r ) / delta );
-
-			} else	{
-
-				hue = 4 + ( ( r - g ) / delta );
-			}
-
-			hue /= 6;
-
-			if ( hue < 0 ) {
-
-				hue += 1;
-
-			}
-
-			if ( hue > 1 ) {
-
-				hue -= 1;
-
-			}
-
-		}
-
-		if ( hsv === undefined ) {
-
-			hsv = { h: 0, s: 0, v: 0 };
-
-		}
-
-		hsv.h = hue;
-		hsv.s = saturation;
-		hsv.v = value;
-
-		return hsv;
+		return this;
 
 	},
 
@@ -1841,9 +1802,55 @@ THREE.extend( THREE.Vector3.prototype, {
 
 	},
 
+	projectOnVector: function () {
+
+		var v1 = new THREE.Vector3();
+
+		return function( vector ) {
+
+			v1.copy( vector ).normalize();
+			var d = this.dot( v1 );
+			return this.copy( v1 ).multiplyScalar( d );
+
+		};
+
+	}(),
+
+	projectOnPlane: function () {
+
+		var v1 = new THREE.Vector3();
+
+		return function( planeNormal ) {
+
+			v1.copy( this ).projectOnVector( planeNormal );
+
+			return this.sub( v1 );
+
+		}
+
+	}(),
+
+	reflect: function () {
+
+		var v1 = new THREE.Vector3();
+
+		return function ( vector ) {
+
+		    v1.copy( this ).projectOnVector( vector ).multiplyScalar( 2 );
+
+		    return this.subVectors( v1, this );
+
+		}
+
+	}(),
+
 	angleTo: function ( v ) {
 
-		return Math.acos( this.dot( v ) / this.length() / v.length() );
+		var theta = this.dot( v ) / ( this.length() * v.length() );
+
+		// clamp, to handle numerical problems
+
+		return Math.acos( THREE.Math.clamp( theta, -1, 1 ) );
 
 	},
 
@@ -2649,6 +2656,130 @@ THREE.extend( THREE.Vector4.prototype, {
  * @author bhouston / http://exocortex.com
  */
 
+THREE.Line3 = function ( start, end ) {
+
+	this.start = ( start !== undefined ) ? start : new THREE.Vector3();
+	this.end = ( end !== undefined ) ? end : new THREE.Vector3();
+
+};
+
+THREE.extend( THREE.Line3.prototype, {
+
+	set: function ( start, end ) {
+
+		this.start.copy( start );
+		this.end.copy( end );
+
+		return this;
+
+	},
+
+	copy: function ( line ) {
+
+		this.start.copy( line.start );
+		this.end.copy( line.end );
+
+		return this;
+
+	},
+
+	center: function ( optionalTarget ) {
+
+		var result = optionalTarget || new THREE.Vector3();
+		return result.addVectors( this.start, this.end ).multiplyScalar( 0.5 );
+
+	},
+
+	delta: function ( optionalTarget ) {
+
+		var result = optionalTarget || new THREE.Vector3();
+		return result.subVectors( this.end, this.start );
+
+	},
+
+	distanceSq: function () {
+
+		return this.start.distanceToSquared( this.end );
+
+	},
+
+	distance: function () {
+
+		return this.start.distanceTo( this.end );
+
+	},
+
+	at: function ( t, optionalTarget ) {
+
+		var result = optionalTarget || new THREE.Vector3();
+
+		return this.delta( result ).multiplyScalar( t ).add( this.start );
+
+	},
+
+	closestPointToPointParameter: function() {
+
+		var startP = new THREE.Vector3();
+		var startEnd = new THREE.Vector3();
+
+		return function ( point, clampToLine ) {
+		
+			startP.subVectors( point, this.start );
+			startEnd.subVectors( this.end, this.start );
+
+			var startEnd2 = startEnd.dot( startEnd );
+			var startEnd_startP = startEnd.dot( startP );
+
+			var t = startEnd_startP / startEnd2;
+
+			if( clampToLine ) {
+				
+	        	t = THREE.Math.clamp( t, 0, 1 );
+
+	        }
+
+	        return t;
+
+		};
+
+	}(),
+
+	closestPointToPoint: function ( point, clampToLine, optionalTarget ) {
+
+		var t = this.closestPointToPointParameter( point, clampToLine );
+
+		var result = optionalTarget || new THREE.Vector3();			
+
+        return this.delta( result ).multiplyScalar( t ).add( this.start );
+
+	},
+
+	applyMatrix4: function ( matrix ) {
+
+		this.start.applyMatrix4( matrix );
+		this.end.applyMatrix4( matrix );
+
+		return this;
+
+	},
+
+	equals: function ( line ) {
+
+		return line.start.equals( this.start ) && line.end.equals( this.end );
+
+	},
+
+	clone: function () {
+
+		return new THREE.Line3().copy( this );
+
+	}
+
+} );
+/**
+ * @author bhouston / http://exocortex.com
+ */
+
 THREE.Box2 = function ( min, max ) {
 
 	this.min = ( min !== undefined ) ? min : new THREE.Vector2( Infinity, Infinity );
@@ -3178,7 +3309,7 @@ THREE.extend( THREE.Box3.prototype, {
 
 	},
 
-	transform: function() {
+	applyMatrix4: function() {
 
 		var points = [
 			new THREE.Vector3(),
@@ -3971,6 +4102,8 @@ THREE.extend( THREE.Matrix4.prototype, {
 
 		return function () {
 
+			console.warn( 'DEPRECATED: Matrix4\'s .getPosition() has been removed. Use Vector3.getPositionFromMatrix( matrix ) instead.' );
+
 			var te = this.elements;
 			return v1.set( te[12], te[13], te[14] );
 
@@ -4316,7 +4449,6 @@ THREE.extend( THREE.Matrix4.prototype, {
 		var m11 = te[0], m21 = te[1], m31 = te[2], m41 = te[3];
 		var m12 = te[4], m22 = te[5], m32 = te[6], m42 = te[7];
 		var m13 = te[8], m23 = te[9], m33 = te[10], m43 = te[11];
-		var m14 = te[12], m24 = te[13], m34 = te[14], m44 = te[15];
 
 		te[0] = r11 * m11 + r21 * m12 + r31 * m13;
 		te[1] = r11 * m21 + r21 * m22 + r31 * m23;
@@ -4690,7 +4822,7 @@ THREE.extend( THREE.Ray.prototype, {
 
 	},
 
-	transform: function ( matrix4 ) {
+	applyMatrix4: function ( matrix4 ) {
 
 		this.direction.add( this.origin ).applyMatrix4( matrix4 );
 		this.origin.applyMatrix4( matrix4 );
@@ -4980,12 +5112,12 @@ THREE.extend( THREE.Plane.prototype, {
 
 	},
 
-	isIntersectionLine: function ( startPoint, endPoint ) {
+	isIntersectionLine: function ( line ) {
 
 		// Note: this tests if a line intersects the plane, not whether it (or its end-points) are coplanar with it.
 
-		var startSign = this.distanceToPoint( startPoint );
-		var endSign = this.distanceToPoint( endPoint );
+		var startSign = this.distanceToPoint( line.start );
+		var endSign = this.distanceToPoint( line.end );
 
 		return ( startSign < 0 && endSign > 0 ) || ( endSign < 0 && startSign > 0 );
 
@@ -4995,20 +5127,20 @@ THREE.extend( THREE.Plane.prototype, {
 
 		var v1 = new THREE.Vector3();
 
-		return function ( startPoint, endPoint, optionalTarget ) {
+		return function ( line, optionalTarget ) {
 
 			var result = optionalTarget || new THREE.Vector3();
 
-			var direction = v1.subVectors( endPoint, startPoint );
+			var direction = line.delta( v1 );
 
 			var denominator = this.normal.dot( direction );
 
 			if ( denominator == 0 ) {
 
 				// line is coplanar, return origin
-				if( this.distanceToPoint( startPoint ) == 0 ) {
+				if( this.distanceToPoint( line.start ) == 0 ) {
 
-					return result.copy( startPoint );
+					return result.copy( line.start );
 
 				}
 
@@ -5017,7 +5149,7 @@ THREE.extend( THREE.Plane.prototype, {
 
 			}
 
-			var t = - ( startPoint.dot( this.normal ) + this.constant ) / denominator;
+			var t = - ( line.start.dot( this.normal ) + this.constant ) / denominator;
 
 			if( t < 0 || t > 1 ) {
 
@@ -5025,7 +5157,7 @@ THREE.extend( THREE.Plane.prototype, {
 
 			}
 
-			return result.copy( direction ).multiplyScalar( t ).add( startPoint );
+			return result.copy( direction ).multiplyScalar( t ).add( line.start );
 
 		};
 
@@ -5039,7 +5171,7 @@ THREE.extend( THREE.Plane.prototype, {
 
 	},
 
-	transform: function() {
+	applyMatrix4: function() {
 
 		var v1 = new THREE.Vector3();
 		var v2 = new THREE.Vector3();
@@ -5187,7 +5319,7 @@ THREE.extend( THREE.Sphere.prototype, {
 
 	},
 
-	transform: function ( matrix ) {
+	applyMatrix4: function ( matrix ) {
 
 		this.center.applyMatrix4( matrix );
 		this.radius = this.radius * matrix.getMaxScaleOnAxis();
@@ -5244,6 +5376,30 @@ THREE.Math = {
 	mapLinear: function ( x, a1, a2, b1, b2 ) {
 
 		return b1 + ( x - a1 ) * ( b2 - b1 ) / ( a2 - a1 );
+
+	},
+
+	// http://en.wikipedia.org/wiki/Smoothstep
+
+	smoothstep: function ( x, min, max ) {
+
+		if ( x <= min ) return 0;
+		if ( x >= max ) return 1;
+
+		x = ( x - min )/( max - min );
+
+		return x*x*(3 - 2*x);
+
+	},
+
+	smootherstep: function ( x, min, max ) {
+
+		if ( x <= min ) return 0;
+		if ( x >= max ) return 1;
+
+		x = ( x - min )/( max - min );
+
+		return x*x*x*(x*(x*6 - 15) + 10);
 
 	},
 
