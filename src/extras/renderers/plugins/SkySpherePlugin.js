@@ -269,9 +269,9 @@ THREE.SkySpherePlugin = function ( options ) {
 
     }
 
-    if (camera.position instanceof THREE.Vector3) {
-      _skyMesh.position = camera.position; // make sure the skysphere does not translate in the camera's referential
-    }
+    // make sure the skysphere does not translate in the camera's referential
+    _skyMesh.position = camera.matrixWorld.getPosition();
+    _skyMesh.updateMatrixWorld();
 
   };
 
