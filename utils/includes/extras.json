@@ -1,6 +1,7 @@
 [
 	"../src/extras/ColorUtils.js",
 	"../src/extras/GeometryUtils.js",
+	"../src/extras/MeshUtils.js",
 	"../src/extras/ImageUtils.js",
 	"../src/extras/SceneUtils.js",
 	"../src/extras/FontUtils.js",
@@ -47,6 +48,7 @@
 	"../src/extras/renderers/plugins/ShadowMapPlugin.js",
 	"../src/extras/renderers/plugins/SpritePlugin.js",
 	"../src/extras/renderers/plugins/DepthPassPlugin.js",
+  "../src/extras/renderers/plugins/SkySpherePlugin.js",
 	"../src/extras/shaders/ShaderFlares.js",
 	"../src/extras/shaders/ShaderSprite.js"
 ]

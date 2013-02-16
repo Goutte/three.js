@@ -38,9 +38,10 @@ THREE.Matrix4.prototype.makeTranslation = function ( v, y, z ) {
 THREE.Geometry.prototype.getFaceArea = function ( faceId, force ) {
 
   force = force || false;
-  if ( !force && face._area !== undefined ) return face._area;
 
   var vA, vB, vC, vD, vertices = this.vertices, face = this.faces[faceId];
+
+  if ( !force && face._area !== undefined ) return face._area;
 
   if ( face instanceof THREE.Face3 ) {
 
