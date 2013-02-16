@@ -6,6 +6,8 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	console.log( 'THREE.CanvasRenderer', THREE.REVISION );
 
+	var smoothstep = THREE.Math.smoothstep;
+
 	parameters = parameters || {};
 
 	var _this = this,
@@ -66,7 +68,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 	_directionalLights = new THREE.Color(),
 	_pointLights = new THREE.Color(),
 
-	_pi2 = Math.PI * 2,
 	_vector3 = new THREE.Vector3(), // Needed for PointLight
 
 	_pixelMap, _pixelMapContext, _pixelMapImage, _pixelMapData,
@@ -105,7 +106,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		} else {
 
-			_context.setLineDash = function ( values ) {}
+			_context.setLineDash = function () {}
 
 		}
 
@@ -298,7 +299,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 				_v1 = element;
 				_v1.x *= _canvasWidthHalf; _v1.y *= _canvasHeightHalf;
 
-				renderParticle( _v1, element, material, scene );
+				renderParticle( _v1, element, material );
 
 			} else if ( element instanceof THREE.RenderableLine ) {
 
@@ -311,7 +312,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				if ( _clipBox.isIntersectionBox( _elemBox ) === true ) {
 
-					renderLine( _v1, _v2, element, material, scene );
+					renderLine( _v1, _v2, element, material );
 
 				}
 
@@ -337,7 +338,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				_elemBox.setFromPoints( [ _v1.positionScreen, _v2.positionScreen, _v3.positionScreen ] );
 
-				renderFace3( _v1, _v2, _v3, 0, 1, 2, element, material, scene );
+				renderFace3( _v1, _v2, _v3, 0, 1, 2, element, material );
 
 			} else if ( element instanceof THREE.RenderableFace4 ) {
 
@@ -468,7 +469,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderParticle( v1, element, material, scene ) {
+		function renderParticle( v1, element, material ) {
 
 			setOpacity( material.opacity );
 			setBlending( material.blending );
@@ -580,7 +581,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderLine( v1, v2, element, material, scene ) {
+		function renderLine( v1, v2, element, material ) {
 
 			setOpacity( material.opacity );
 			setBlending( material.blending );
@@ -615,7 +616,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderFace3( v1, v2, v3, uv1, uv2, uv3, element, material, scene ) {
+		function renderFace3( v1, v2, v3, uv1, uv2, uv3, element, material ) {
 
 			_this.info.render.vertices += 3;
 			_this.info.render.faces ++;
@@ -741,17 +742,9 @@ THREE.CanvasRenderer = function ( parameters ) {
 				_near = camera.near;
 				_far = camera.far;
 
-				var depth;
-
-				depth = 1 - smoothstep( v1.positionScreen.z * v1.positionScreen.w, _near, _far );
-				_color1.setRGB( depth, depth, depth );
-
-				depth = 1 - smoothstep( v2.positionScreen.z * v2.positionScreen.w, _near, _far )
-				_color2.setRGB( depth, depth, depth );
-
-				depth = 1 - smoothstep( v3.positionScreen.z * v3.positionScreen.w, _near, _far );
-				_color3.setRGB( depth, depth, depth );
-
+				_color1.r = _color1.g = _color1.b = 1 - smoothstep( v1.positionScreen.z * v1.positionScreen.w, _near, _far );
+				_color2.r = _color2.g = _color2.b = 1 - smoothstep( v2.positionScreen.z * v2.positionScreen.w, _near, _far );
+				_color3.r = _color3.g = _color3.b = 1 - smoothstep( v3.positionScreen.z * v3.positionScreen.w, _near, _far );
 				_color4.addColors( _color2, _color3 ).multiplyScalar( 0.5 );
 
 				_image = getGradientTexture( _color1, _color2, _color3, _color4 );
@@ -795,7 +788,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderFace4( v1, v2, v3, v4, v5, v6, element, material, scene ) {
+		function renderFace4( v1, v2, v3, v4, v5, v6, element, material ) {
 
 			_this.info.render.vertices += 4;
 			_this.info.render.faces ++;
@@ -807,8 +800,8 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				// Let renderFace3() handle this
 
-				renderFace3( v1, v2, v4, 0, 1, 3, element, material, scene );
-				renderFace3( v5, v3, v6, 1, 2, 3, element, material, scene );
+				renderFace3( v1, v2, v4, 0, 1, 3, element, material );
+				renderFace3( v5, v3, v6, 1, 2, 3, element, material );
 
 				return;
 
@@ -1169,13 +1162,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 			_gradientMapContext.drawImage( _pixelMap, 0, 0 );
 
 			return _gradientMap;
-
-		}
-
-		function smoothstep( value, min, max ) {
-
-			var x = ( value - min ) / ( max - min );
-			return x * x * ( 3 - 2 * x );
 
 		}
 

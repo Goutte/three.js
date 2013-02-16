@@ -6,7 +6,7 @@
  * @author gero3 / https://github.com/gero3/
  */
 
-THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
+THREE.WebGLRenderer = function ( parameters ) {
 
 	console.log( 'THREE.WebGLRenderer', THREE.REVISION );
 
@@ -34,14 +34,14 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 	};
 
 
-	var renderer = new THREE.WebGLRenderer2.LowLevelRenderer(parameters);
-	var meshRenderer = new THREE.WebGLRenderer2.MeshRenderer(renderer, info);
-	var particleRenderer = new THREE.WebGLRenderer2.ParticleRenderer(renderer, info);
-	var lineRenderer = new THREE.WebGLRenderer2.LineRenderer(renderer, info);
-	var ribbonRenderer = new THREE.WebGLRenderer2.RibbonRenderer(renderer, info);
-	
-	var shaderBuilder = new THREE.WebGLRenderer2.ShaderBuilder(renderer, info);
-	
+	var renderer = new THREE.WebGLRenderer.LowLevelRenderer(parameters);
+	var meshRenderer = new THREE.WebGLRenderer.MeshRenderer(renderer, info);
+	var particleRenderer = new THREE.WebGLRenderer.ParticleRenderer(renderer, info);
+	var lineRenderer = new THREE.WebGLRenderer.LineRenderer(renderer, info);
+	var ribbonRenderer = new THREE.WebGLRenderer.RibbonRenderer(renderer, info);
+
+	var shaderBuilder = new THREE.WebGLRenderer.ShaderBuilder(renderer, info);
+
 	// clearing
 
 	this.autoClear = true;
@@ -169,7 +169,6 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 	this.setTexture = renderer.setTexture;
 	this.setMaterialFaces = renderer.setMaterialFaces;
 	this.setFaceCulling = renderer.setFaceCulling;
-	
 
 	// Clearing
 
@@ -204,7 +203,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		_currentGeometryGroupHash = -1;
 		_currentMaterialId = -1;
 		_lightsNeedUpdate = true;
-		
+
 		renderer.resetState();
 
 
@@ -377,7 +376,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		// only deallocate GL program if this was the last use of shared program
 		// assumed there is only single copy of any program in the _programs list
 		// (that's how it's constructed)
-		
+
 		shaderBuilder.removeProgram(program)
 
 	};
@@ -446,7 +445,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		}
 
 	};
-	
+
 	function getBufferMaterial( object, geometryGroup ) {
 
 		return object.material instanceof THREE.MeshFaceMaterial
@@ -466,7 +465,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 			attribute = geometry.attributes[ a ];
 
 			attribute.buffer = renderer.createBuffer();
-			
+
 			if ( a === "index" ) {
 
 				renderer.setStaticIndexBuffer(attribute.buffer,attribute.array);
@@ -495,7 +494,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		var tangent = attributes[ "tangent" ];
 
 		if ( geometry.elementsNeedUpdate && index !== undefined ) {
-			
+
 			renderer.setDynamicIndexBuffer(	index.buffer, index.array);
 
 		}
@@ -609,14 +608,14 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		}
 
 		if ( object.hasUvs && material.map ) {
-			
+
 			renderer.setDynamicArrayBuffer( object.__webglUvBuffer, object.uvArray);
 			renderer.setFloatAttribute(program.attributes.uv, object.__webglUvBuffer, 2, 0);
 
 		}
 
 		if ( object.hasColors && material.vertexColors !== THREE.NoColors ) {
-			
+
 			renderer.setDynamicArrayBuffer( object.__webglColorBuffer, object.colorArray);
 			renderer.setFloatAttribute(program.attributes.color, object.__webglColorBuffer, 3, 0);
 
@@ -860,6 +859,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 				}
 
 				// render lines
+				renderer.setLineWidth( material.linewidth );
 				renderer.drawLineStrip(position.numItems / 3);
 
 				_this.info.render.calls ++;
@@ -903,7 +903,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		if ( !material.morphTargets && attributes.position >= 0 ) {
 
 			if ( updateBuffers ) {
-				
+
 				renderer.setFloatAttribute(attributes.position , geometryGroup.__webglVertexBuffer, 3, 0);
 
 			}
@@ -932,7 +932,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 					attribute = geometryGroup.__webglCustomAttributesList[ i ];
 
 					if ( attributes[ attribute.buffer.belongsToAttribute ] >= 0 ) {
-						
+
 						renderer.setFloatAttribute(attributes[ attribute.buffer.belongsToAttribute ] , attribute.buffer, attribute.size, 0);
 
 					}
@@ -991,7 +991,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 			// line distances
 
 			if ( attributes.lineDistance >= 0 ) {
-				
+
 				renderer.setFloatAttribute(attributes.lineDistance, geometryGroup.__webglLineDistanceBuffer, 1, 0);
 
 			}
@@ -1026,15 +1026,15 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		} else if ( object instanceof THREE.Line ) {
 
 			renderer.setLineWidth( material.linewidth );
-			
+
 			if (object.type === THREE.LineStrip) {
-				
+
 				renderer.drawLineStrip(geometryGroup.__webglLineCount);
-				
+
 			} else {
-				
+
 				renderer.drawLines(geometryGroup.__webglLineCount);
-				
+
 			}
 
 			_this.info.render.calls ++;
@@ -1042,7 +1042,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 		// render particles
 
 		} else if ( object instanceof THREE.ParticleSystem ) {
-			
+
 			renderer.drawPoints(geometryGroup.__webglParticleCount);
 
 			_this.info.render.calls ++;
@@ -1147,13 +1147,13 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 					influenceIndex = activeInfluenceIndices[ m ][ 1 ];
 
 					if ( attributes[ "morphTarget" + m ] >= 0 ) {
-						
+
 						renderer.setFloatAttribute(attributes[ "morphTarget" + m ], geometryGroup.__webglMorphTargetsBuffers[ influenceIndex ], 3, 0);
 
 					}
 
 					if ( attributes[ "morphNormal" + m ] >= 0 && material.morphNormals ) {
-						
+
 						renderer.setFloatAttribute(attributes[ "morphNormal" + m ], geometryGroup.__webglMorphNormalsBuffers[ influenceIndex ], 3, 0);
 
 					}
@@ -1304,7 +1304,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 
 						} else {
 
-							_vector3.copy( object.matrixWorld.getPosition() );
+							_vector3.getPositionFromMatrix( object.matrixWorld );
 							_vector3.applyProjection(_projScreenMatrix);
 
 							webglObject.z = _vector3.z;
@@ -1807,8 +1807,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 				}
 
 			} else if ( object instanceof THREE.Line ) {
-				
-				
+
 				geometry = object.geometry;
 
 				if ( ! geometry.__webglVertexBuffer ) {
@@ -2018,7 +2017,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 			material.attributes && clearCustomAttributes( material );
 
 		} else if ( object instanceof THREE.Line ) {
-			
+
 			if ( geometry instanceof THREE.BufferGeometry ) {
 
 				if ( geometry.verticesNeedUpdate || geometry.colorsNeedUpdate ) {
@@ -2033,23 +2032,23 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 			} else {
 
 				material = getBufferMaterial( object, geometry );
-	
+
 				customAttributesDirty = material.attributes && areCustomAttributesDirty( material );
-	
+
 				if ( geometry.verticesNeedUpdate || geometry.colorsNeedUpdate || geometry.lineDistancesNeedUpdate || customAttributesDirty ) {
-	
+
 					lineRenderer.setBuffers( geometry);
-	
+
 				}
-	
+
 				geometry.verticesNeedUpdate = false;
 				geometry.colorsNeedUpdate = false;
 				geometry.lineDistancesNeedUpdate = false;
-	
+
 				material.attributes && clearCustomAttributes( material );
 
 			}
-			
+
 		} else if ( object instanceof THREE.ParticleSystem ) {
 
 			if ( geometry instanceof THREE.BufferGeometry ) {
@@ -2269,7 +2268,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 			wrapAround: material.wrapAround,
 			doubleSided: material.side === THREE.DoubleSide,
 			flipSided: material.side === THREE.BackSide,
-			
+
 			gammaInput : this.gammaInput,
 			gammaOutput  : this.gammaOutput ,
 			physicallyBasedShading : this.physicallyBasedShading
@@ -2507,8 +2506,8 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 
 				if ( p_uniforms.cameraPosition !== null ) {
 
-					var position = camera.matrixWorld.getPosition();
-					renderer.uniform3f( p_uniforms.cameraPosition, position.x, position.y, position.z );
+					_vector3.getPositionFromMatrix( camera.matrixWorld );
+					renderer.uniform3f( p_uniforms.cameraPosition, _vector3.x, _vector3.y, _vector3.z );
 
 				}
 
@@ -3109,8 +3108,9 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 
 				if ( ! light.visible ) continue;
 
-				_direction.copy( light.matrixWorld.getPosition() );
-				_direction.sub( light.target.matrixWorld.getPosition() );
+				_direction.getPositionFromMatrix( light.matrixWorld );
+				_vector3.getPositionFromMatrix( light.target.matrixWorld );					
+				_direction.sub( _vector3 );
 				_direction.normalize();
 
 				// skip lights with undefined direction
@@ -3154,11 +3154,11 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 
 				}
 
-				position = light.matrixWorld.getPosition();
+				_vector3.getPositionFromMatrix( light.matrixWorld );
 
-				pointPositions[ pointOffset ]     = position.x;
-				pointPositions[ pointOffset + 1 ] = position.y;
-				pointPositions[ pointOffset + 2 ] = position.z;
+				pointPositions[ pointOffset ]     = _vector3.x;
+				pointPositions[ pointOffset + 1 ] = _vector3.y;
+				pointPositions[ pointOffset + 2 ] = _vector3.z;
 
 				pointDistances[ pointLength ] = distance;
 
@@ -3182,16 +3182,17 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 
 				}
 
-				position = light.matrixWorld.getPosition();
+				_vector3.getPositionFromMatrix( light.matrixWorld );
 
-				spotPositions[ spotOffset ]     = position.x;
-				spotPositions[ spotOffset + 1 ] = position.y;
-				spotPositions[ spotOffset + 2 ] = position.z;
+				spotPositions[ spotOffset ]     = _vector3.x;
+				spotPositions[ spotOffset + 1 ] = _vector3.y;
+				spotPositions[ spotOffset + 2 ] = _vector3.z;
 
 				spotDistances[ spotLength ] = distance;
 
-				_direction.copy( position );
-				_direction.sub( light.target.matrixWorld.getPosition() );
+				_direction.copy( _vector3 );
+				_vector3.getPositionFromMatrix( light.target.matrixWorld );
+				_direction.sub( _vector3 );
 				_direction.normalize();
 
 				spotDirections[ spotOffset ]     = _direction.x;
@@ -3209,7 +3210,7 @@ THREE.WebGLRenderer = THREE.WebGLRenderer2 = function ( parameters ) {
 
 				if ( ! light.visible ) continue;
 
-				_direction.copy( light.matrixWorld.getPosition() );
+				_direction.getPositionFromMatrix( light.matrixWorld );
 				_direction.normalize();
 
 				// skip lights with undefined direction

@@ -3,7 +3,7 @@
  * @author Larry Battle / http://bateru.com/news
  */
 
-var THREE = THREE || { REVISION: '56dev' };
+var THREE = THREE || { REVISION: '56' };
 
 self.console = self.console || {
 
@@ -18,53 +18,44 @@ self.console = self.console || {
 self.Int32Array = self.Int32Array || Array;
 self.Float32Array = self.Float32Array || Array;
 
-// Shims for "startsWith", "endsWith", and "trim" for browsers where this is not yet implemented
-// not sure we should have this, or at least not have it here
-
-// http://stackoverflow.com/questions/646628/javascript-startswith
-// http://stackoverflow.com/questions/498970/how-do-i-trim-a-string-in-javascript
-// http://wiki.ecmascript.org/doku.php?id=harmony%3astring_extras
-
-String.prototype.startsWith = String.prototype.startsWith || function ( str ) {
-
-	return this.slice( 0, str.length ) === str;
-
-};
-
-String.prototype.endsWith = String.prototype.endsWith || function ( str ) {
-
-	var t = String( str );
-	var index = this.lastIndexOf( t );
-	return ( -1 < index && index ) === (this.length - t.length);
-
-};
-
 String.prototype.trim = String.prototype.trim || function () {
 
 	return this.replace( /^\s+|\s+$/g, '' );
 
 };
 
-// based on http://stackoverflow.com/a/12317051
-THREE.extend = function ( target, other ) {
+// based on https://github.com/documentcloud/underscore/blob/bf657be243a075b5e72acc8a83e6f12a564d8f55/underscore.js#L767
+THREE.extend = function ( obj, source ) {
 
-	target = target || {};
+	// ECMAScript5 compatibility based on: http://www.nczonline.net/blog/2012/12/11/are-your-mixins-ecmascript-5-compatible/
+	if ( Object.keys ) {
 
-	for (var prop in other) {
+		var keys = Object.keys( source );
 
-		if ( typeof other[prop] === 'object' ) {
+		for (var i = 0, il = keys.length; i < il; i++) {
 
-			target[prop] = THREE.extend( target[prop], other[prop] );
+			var prop = keys[i];
+			Object.defineProperty( obj, prop, Object.getOwnPropertyDescriptor( source, prop ) );
 
-		} else {
+		}
 
-			target[prop] = other[prop];
+	} else {
+
+		var safeHasOwnProperty = {}.hasOwnProperty;
+
+		for ( var prop in source ) {
+
+			if ( safeHasOwnProperty.call( source, prop ) ) {
+
+				obj[prop] = source[prop];
+
+			}
 
 		}
 
 	}
 
-	return target;
+	return obj;
 
 };
 
@@ -88,7 +79,7 @@ THREE.extend = function ( target, other ) {
 
 	if ( window.requestAnimationFrame === undefined ) {
 
-		window.requestAnimationFrame = function ( callback, element ) {
+		window.requestAnimationFrame = function ( callback ) {
 
 			var currTime = Date.now(), timeToCall = Math.max( 0, 16 - ( currTime - lastTime ) );
 			var id = window.setTimeout( function() { callback( currTime + timeToCall ); }, timeToCall );
@@ -306,60 +297,38 @@ THREE.extend( THREE.Color.prototype, {
 
 	setHSV: function ( h, s, v ) {
 
-		// based on MochiKit implementation by Bob Ippolito
-		// h,s,v ranges are < 0.0 - 1.0 >
+		console.log( 'DEPRECATED: Color\'s .setHSV() will be removed. Use .setHSL( h, s, l ) instead.' );
+		return this.setHSL(h,s*v/((h=(2-s)*v)<1?h:2-h),h/2); // https://gist.github.com/xpansive/1337890
 
-		var i, f, p, q, t;
+	},
 
-		if ( v === 0 ) {
+	setHSL: function ( h, s, l ) {
 
-			this.r = this.g = this.b = 0;
+		// h,s,l ranges are in 0.0 - 1.0
+
+		if ( s === 0 ) {
+
+			this.r = this.g = this.b = l;
 
 		} else {
 
-			i = Math.floor( h * 6 );
-			f = ( h * 6 ) - i;
-			p = v * ( 1 - s );
-			q = v * ( 1 - ( s * f ) );
-			t = v * ( 1 - ( s * ( 1 - f ) ) );
+			var hue2rgb = function ( p, q, t ) {
 
-			if ( i === 0 ) {
+				if ( t < 0 ) t += 1;
+				if ( t > 1 ) t -= 1;
+				if ( t < 1 / 6 ) return p + ( q - p ) * 6 * t;
+				if ( t < 1 / 2 ) return q;
+				if ( t < 2 / 3 ) return p + ( q - p ) * 6 * ( 2 / 3 - t );
+				return p;
 
-				this.r = v;
-				this.g = t;
-				this.b = p;
+			};
 
-			} else if ( i === 1 ) {
+			var p = l <= 0.5 ? l * ( 1 + s ) : l + s - ( l * s );
+			var q = ( 2 * l ) - p;
 
-				this.r = q;
-				this.g = v;
-				this.b = p;
-
-			} else if ( i === 2 ) {
-
-				this.r = p;
-				this.g = v;
-				this.b = t;
-
-			} else if ( i === 3 ) {
-
-				this.r = p;
-				this.g = q;
-				this.b = v;
-
-			} else if ( i === 4 ) {
-
-				this.r = t;
-				this.g = p;
-				this.b = v;
-
-			} else if ( i === 5 ) {
-
-				this.r = v;
-				this.g = p;
-				this.b = q;
-
-			}
+			this.r = hue2rgb( q, p, h + 1 / 3 );
+			this.g = hue2rgb( q, p, h );
+			this.b = hue2rgb( q, p, h - 1 / 3 );
 
 		}
 
@@ -498,78 +467,70 @@ THREE.extend( THREE.Color.prototype, {
 
 	},
 
+	getHSL: function () {
+
+		var hsl = { h: 0, s: 0, l: 0 };
+
+		return function () {
+
+			// h,s,l ranges are in 0.0 - 1.0
+
+			var r = this.r, g = this.g, b = this.b;
+
+			var max = Math.max( r, g, b );
+			var min = Math.min( r, g, b );
+
+			var hue, saturation;
+			var lightness = ( min + max ) / 2.0;
+
+			if ( min === max ) {
+
+				hue = 0;
+				saturation = 0;
+
+			} else {
+
+				var delta = max - min;
+
+				saturation = lightness <= 0.5 ? delta / ( max + min ) : delta / ( 2 - max - min );
+
+				switch ( max ) {
+
+					case r: hue = ( g - b ) / delta + ( g < b ? 6 : 0 ); break;
+					case g: hue = ( b - r ) / delta + 2; break;
+					case b: hue = ( r - g ) / delta + 4; break;
+
+				}
+
+				hue /= 6;
+
+			}
+
+			hsl.h = hue;
+			hsl.s = saturation;
+			hsl.l = lightness;
+
+			return hsl;
+
+		};
+
+	}(),
+
 	getStyle: function () {
 
-		return 'rgb(' + ( ( this.r * 255 ) | 0 )  + ',' + ( ( this.g * 255 ) | 0 ) + ',' + ( ( this.b * 255 ) | 0 ) + ')';
+		return 'rgb(' + ( ( this.r * 255 ) | 0 ) + ',' + ( ( this.g * 255 ) | 0 ) + ',' + ( ( this.b * 255 ) | 0 ) + ')';
 
 	},
 
-	getHSV: function ( hsv ) {
+	offsetHSL: function ( h, s, l ) {
 
-		// based on MochiKit implementation by Bob Ippolito
-		// h,s,v ranges are < 0.0 - 1.0 >
+		var hsl = this.getHSL();
 
-		var r = this.r;
-		var g = this.g;
-		var b = this.b;
+		hsl.h += h; hsl.s += s; hsl.l += l;
 
-		var max = Math.max( Math.max( r, g ), b );
-		var min = Math.min( Math.min( r, g ), b );
+		this.setHSL( hsl.h, hsl.s, hsl.l );
 
-		var hue;
-		var saturation;
-		var value = max;
-
-		if ( min === max )	{
-
-			hue = 0;
-			saturation = 0;
-
-		} else {
-
-			var delta = ( max - min );
-			saturation = delta / max;
-
-			if ( r === max ) {
-
-				hue = ( g - b ) / delta;
-
-			} else if ( g === max ) {
-
-				hue = 2 + ( ( b - r ) / delta );
-
-			} else	{
-
-				hue = 4 + ( ( r - g ) / delta );
-			}
-
-			hue /= 6;
-
-			if ( hue < 0 ) {
-
-				hue += 1;
-
-			}
-
-			if ( hue > 1 ) {
-
-				hue -= 1;
-
-			}
-
-		}
-
-		if ( hsv === undefined ) {
-
-			hsv = { h: 0, s: 0, v: 0 };
-
-		}
-
-		hsv.h = hue;
-		hsv.s = saturation;
-		hsv.v = value;
-
-		return hsv;
+		return this;
 
 	},
 
@@ -1841,9 +1802,55 @@ THREE.extend( THREE.Vector3.prototype, {
 
 	},
 
+	projectOnVector: function () {
+
+		var v1 = new THREE.Vector3();
+
+		return function( vector ) {
+
+			v1.copy( vector ).normalize();
+			var d = this.dot( v1 );
+			return this.copy( v1 ).multiplyScalar( d );
+
+		};
+
+	}(),
+
+	projectOnPlane: function () {
+
+		var v1 = new THREE.Vector3();
+
+		return function( planeNormal ) {
+
+			v1.copy( this ).projectOnVector( planeNormal );
+
+			return this.sub( v1 );
+
+		}
+
+	}(),
+
+	reflect: function () {
+
+		var v1 = new THREE.Vector3();
+
+		return function ( vector ) {
+
+		    v1.copy( this ).projectOnVector( vector ).multiplyScalar( 2 );
+
+		    return this.subVectors( v1, this );
+
+		}
+
+	}(),
+
 	angleTo: function ( v ) {
 
-		return Math.acos( this.dot( v ) / this.length() / v.length() );
+		var theta = this.dot( v ) / ( this.length() * v.length() );
+
+		// clamp, to handle numerical problems
+
+		return Math.acos( THREE.Math.clamp( theta, -1, 1 ) );
 
 	},
 
@@ -2649,6 +2656,130 @@ THREE.extend( THREE.Vector4.prototype, {
  * @author bhouston / http://exocortex.com
  */
 
+THREE.Line3 = function ( start, end ) {
+
+	this.start = ( start !== undefined ) ? start : new THREE.Vector3();
+	this.end = ( end !== undefined ) ? end : new THREE.Vector3();
+
+};
+
+THREE.extend( THREE.Line3.prototype, {
+
+	set: function ( start, end ) {
+
+		this.start.copy( start );
+		this.end.copy( end );
+
+		return this;
+
+	},
+
+	copy: function ( line ) {
+
+		this.start.copy( line.start );
+		this.end.copy( line.end );
+
+		return this;
+
+	},
+
+	center: function ( optionalTarget ) {
+
+		var result = optionalTarget || new THREE.Vector3();
+		return result.addVectors( this.start, this.end ).multiplyScalar( 0.5 );
+
+	},
+
+	delta: function ( optionalTarget ) {
+
+		var result = optionalTarget || new THREE.Vector3();
+		return result.subVectors( this.end, this.start );
+
+	},
+
+	distanceSq: function () {
+
+		return this.start.distanceToSquared( this.end );
+
+	},
+
+	distance: function () {
+
+		return this.start.distanceTo( this.end );
+
+	},
+
+	at: function ( t, optionalTarget ) {
+
+		var result = optionalTarget || new THREE.Vector3();
+
+		return this.delta( result ).multiplyScalar( t ).add( this.start );
+
+	},
+
+	closestPointToPointParameter: function() {
+
+		var startP = new THREE.Vector3();
+		var startEnd = new THREE.Vector3();
+
+		return function ( point, clampToLine ) {
+		
+			startP.subVectors( point, this.start );
+			startEnd.subVectors( this.end, this.start );
+
+			var startEnd2 = startEnd.dot( startEnd );
+			var startEnd_startP = startEnd.dot( startP );
+
+			var t = startEnd_startP / startEnd2;
+
+			if( clampToLine ) {
+				
+	        	t = THREE.Math.clamp( t, 0, 1 );
+
+	        }
+
+	        return t;
+
+		};
+
+	}(),
+
+	closestPointToPoint: function ( point, clampToLine, optionalTarget ) {
+
+		var t = this.closestPointToPointParameter( point, clampToLine );
+
+		var result = optionalTarget || new THREE.Vector3();			
+
+        return this.delta( result ).multiplyScalar( t ).add( this.start );
+
+	},
+
+	applyMatrix4: function ( matrix ) {
+
+		this.start.applyMatrix4( matrix );
+		this.end.applyMatrix4( matrix );
+
+		return this;
+
+	},
+
+	equals: function ( line ) {
+
+		return line.start.equals( this.start ) && line.end.equals( this.end );
+
+	},
+
+	clone: function () {
+
+		return new THREE.Line3().copy( this );
+
+	}
+
+} );
+/**
+ * @author bhouston / http://exocortex.com
+ */
+
 THREE.Box2 = function ( min, max ) {
 
 	this.min = ( min !== undefined ) ? min : new THREE.Vector2( Infinity, Infinity );
@@ -3178,7 +3309,7 @@ THREE.extend( THREE.Box3.prototype, {
 
 	},
 
-	transform: function() {
+	applyMatrix4: function() {
 
 		var points = [
 			new THREE.Vector3(),
@@ -3971,6 +4102,8 @@ THREE.extend( THREE.Matrix4.prototype, {
 
 		return function () {
 
+			console.warn( 'DEPRECATED: Matrix4\'s .getPosition() has been removed. Use Vector3.getPositionFromMatrix( matrix ) instead.' );
+
 			var te = this.elements;
 			return v1.set( te[12], te[13], te[14] );
 
@@ -4316,7 +4449,6 @@ THREE.extend( THREE.Matrix4.prototype, {
 		var m11 = te[0], m21 = te[1], m31 = te[2], m41 = te[3];
 		var m12 = te[4], m22 = te[5], m32 = te[6], m42 = te[7];
 		var m13 = te[8], m23 = te[9], m33 = te[10], m43 = te[11];
-		var m14 = te[12], m24 = te[13], m34 = te[14], m44 = te[15];
 
 		te[0] = r11 * m11 + r21 * m12 + r31 * m13;
 		te[1] = r11 * m21 + r21 * m22 + r31 * m23;
@@ -4363,34 +4495,20 @@ THREE.extend( THREE.Matrix4.prototype, {
 
 	},
 
-  /**
-   * Sets this matrix to be a translation matrix of Vector v
-   *
-   * @param {THREE.Vector3} v
-   * @param y Deprecated
-   * @param z Deprecated
-   * @return {THREE.Matrix4}
-   */
-  makeTranslation: function ( v, y, z ) {
+	makeTranslation: function ( x, y, z ) {
 
-    if ( v instanceof THREE.Vector3 ) {
-      z = v.z;
-      y = v.y;
-      v = v.x;
-    } else {
-      console.warn( "DEPRECATED: Use makeTranslation( Vector3 ) instead" );
-    }
+		this.set(
 
-    this.set(
-      1, 0, 0, v,
-      0, 1, 0, y,
-      0, 0, 1, z,
-      0, 0, 0, 1
-    );
+			1, 0, 0, x,
+			0, 1, 0, y,
+			0, 0, 1, z,
+			0, 0, 0, 1
 
-    return this;
+		);
 
-  },
+		return this;
+
+	},
 
 	makeRotationX: function ( theta ) {
 
@@ -4690,7 +4808,7 @@ THREE.extend( THREE.Ray.prototype, {
 
 	},
 
-	transform: function ( matrix4 ) {
+	applyMatrix4: function ( matrix4 ) {
 
 		this.direction.add( this.origin ).applyMatrix4( matrix4 );
 		this.origin.applyMatrix4( matrix4 );
@@ -4816,7 +4934,7 @@ THREE.extend( THREE.Sphere.prototype, {
 
 	},
 
-	transform: function ( matrix ) {
+	applyMatrix4: function ( matrix ) {
 
 		this.center.applyMatrix4( matrix );
 		this.radius = this.radius * matrix.getMaxScaleOnAxis();
@@ -5114,12 +5232,12 @@ THREE.extend( THREE.Plane.prototype, {
 
 	},
 
-	isIntersectionLine: function ( startPoint, endPoint ) {
+	isIntersectionLine: function ( line ) {
 
 		// Note: this tests if a line intersects the plane, not whether it (or its end-points) are coplanar with it.
 
-		var startSign = this.distanceToPoint( startPoint );
-		var endSign = this.distanceToPoint( endPoint );
+		var startSign = this.distanceToPoint( line.start );
+		var endSign = this.distanceToPoint( line.end );
 
 		return ( startSign < 0 && endSign > 0 ) || ( endSign < 0 && startSign > 0 );
 
@@ -5129,20 +5247,20 @@ THREE.extend( THREE.Plane.prototype, {
 
 		var v1 = new THREE.Vector3();
 
-		return function ( startPoint, endPoint, optionalTarget ) {
+		return function ( line, optionalTarget ) {
 
 			var result = optionalTarget || new THREE.Vector3();
 
-			var direction = v1.subVectors( endPoint, startPoint );
+			var direction = line.delta( v1 );
 
 			var denominator = this.normal.dot( direction );
 
 			if ( denominator == 0 ) {
 
 				// line is coplanar, return origin
-				if( this.distanceToPoint( startPoint ) == 0 ) {
+				if( this.distanceToPoint( line.start ) == 0 ) {
 
-					return result.copy( startPoint );
+					return result.copy( line.start );
 
 				}
 
@@ -5151,7 +5269,7 @@ THREE.extend( THREE.Plane.prototype, {
 
 			}
 
-			var t = - ( startPoint.dot( this.normal ) + this.constant ) / denominator;
+			var t = - ( line.start.dot( this.normal ) + this.constant ) / denominator;
 
 			if( t < 0 || t > 1 ) {
 
@@ -5159,7 +5277,7 @@ THREE.extend( THREE.Plane.prototype, {
 
 			}
 
-			return result.copy( direction ).multiplyScalar( t ).add( startPoint );
+			return result.copy( direction ).multiplyScalar( t ).add( line.start );
 
 		};
 
@@ -5173,7 +5291,7 @@ THREE.extend( THREE.Plane.prototype, {
 
 	},
 
-	transform: function() {
+	applyMatrix4: function() {
 
 		var v1 = new THREE.Vector3();
 		var v2 = new THREE.Vector3();
@@ -5244,6 +5362,30 @@ THREE.Math = {
 	mapLinear: function ( x, a1, a2, b1, b2 ) {
 
 		return b1 + ( x - a1 ) * ( b2 - b1 ) / ( a2 - a1 );
+
+	},
+
+	// http://en.wikipedia.org/wiki/Smoothstep
+
+	smoothstep: function ( x, min, max ) {
+
+		if ( x <= min ) return 0;
+		if ( x >= max ) return 1;
+
+		x = ( x - min )/( max - min );
+
+		return x*x*(3 - 2*x);
+
+	},
+
+	smootherstep: function ( x, min, max ) {
+
+		if ( x <= min ) return 0;
+		if ( x >= max ) return 1;
+
+		x = ( x - min )/( max - min );
+
+		return x*x*x*(x*(x*6 - 15) + 10);
 
 	},
 
@@ -5849,6 +5991,7 @@ THREE.EventDispatcher = function () {
 	var localRay = new THREE.Ray();
 	var facePlane = new THREE.Plane();
 	var intersectPoint = new THREE.Vector3();
+	var matrixPosition = new THREE.Vector3();
 
 	var inverseMatrix = new THREE.Matrix4();
 
@@ -5862,7 +6005,8 @@ THREE.EventDispatcher = function () {
 
 		if ( object instanceof THREE.Particle ) {
 
-			var distance = raycaster.ray.distanceToPoint( object.matrixWorld.getPosition() );
+			matrixPosition.getPositionFromMatrix( object.matrixWorld );
+			var distance = raycaster.ray.distanceToPoint( matrixPosition );
 
 			if ( distance > object.scale.x ) {
 
@@ -5882,8 +6026,9 @@ THREE.EventDispatcher = function () {
 		} else if ( object instanceof THREE.Mesh ) {
 
 			// Checking boundingSphere distance to ray
+			matrixPosition.getPositionFromMatrix( object.matrixWorld );
 			sphere.set(
-				object.matrixWorld.getPosition(),
+				matrixPosition,
 				object.geometry.boundingSphere.radius * object.matrixWorld.getMaxScaleOnAxis() );
 
 			if ( ! raycaster.ray.isIntersectionSphere( sphere ) ) {
@@ -5909,7 +6054,7 @@ THREE.EventDispatcher = function () {
 
 			inverseMatrix.getInverse( object.matrixWorld );
 
-			localRay.copy( raycaster.ray ).transform( inverseMatrix );
+			localRay.copy( raycaster.ray ).applyMatrix4( inverseMatrix );
 
 			for ( var f = 0, fl = geometry.faces.length; f < fl; f ++ ) {
 
@@ -6452,9 +6597,7 @@ THREE.Projector = function () {
 	_frustum = new THREE.Frustum(),
 
 	_clippedVertex1PositionScreen = new THREE.Vector4(),
-	_clippedVertex2PositionScreen = new THREE.Vector4(),
-
-	_face3VertexNormals;
+	_clippedVertex2PositionScreen = new THREE.Vector4();
 
 	this.projectVector = function ( vector, camera ) {
 
@@ -6595,8 +6738,7 @@ THREE.Projector = function () {
 
 		var visible = false,
 		o, ol, v, vl, f, fl, n, nl, c, cl, u, ul, object,
-		geometry, vertices, vertex, vertexPositionScreen,
-		faces, face, faceVertexNormals, faceVertexUvs, uvs,
+		geometry, vertices, faces, face, faceVertexNormals, faceVertexUvs, uvs,
 		v1, v2, v3, v4, isFaceMaterial, objectMaterials;
 
 		_face3Count = 0;
@@ -7299,16 +7441,15 @@ THREE.Geometry.prototype = {
 
 	computeFaceNormals: function () {
 
-		var n, nl, v, vl, vertex, f, fl, face, vA, vB, vC,
-		cb = new THREE.Vector3(), ab = new THREE.Vector3();
+		var cb = new THREE.Vector3(), ab = new THREE.Vector3();
 
-		for ( f = 0, fl = this.faces.length; f < fl; f ++ ) {
+		for ( var f = 0, fl = this.faces.length; f < fl; f ++ ) {
 
-			face = this.faces[ f ];
+			var face = this.faces[ f ];
 
-			vA = this.vertices[ face.a ];
-			vB = this.vertices[ face.b ];
-			vC = this.vertices[ face.c ];
+			var vA = this.vertices[ face.a ];
+			var vB = this.vertices[ face.b ];
+			var vC = this.vertices[ face.c ];
 
 			cb.subVectors( vC, vB );
 			ab.subVectors( vA, vB );
@@ -8474,7 +8615,6 @@ THREE.BufferGeometry.prototype = {
 		var tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
 		var n = new THREE.Vector3(), n2 = new THREE.Vector3();
 		var w, t, test;
-		var nx, ny, nz;
 
 		function handleVertex( v ) {
 
@@ -9052,7 +9192,7 @@ THREE.Loader.prototype = {
 
 		function create_texture( where, name, sourceFile, repeat, offset, wrap, anisotropy ) {
 
-			var isCompressed = sourceFile.toLowerCase().endsWith( ".dds" );
+			var isCompressed = /\.dds$/i.test( sourceFile );
 			var fullPath = texturePath + "/" + sourceFile;
 
 			if ( isCompressed ) {
@@ -10755,7 +10895,7 @@ THREE.SceneLoader.prototype.parse = function ( json, callbackFinished, url ) {
 
 			}
 
-			var isCompressed = url_array[ 0 ].endsWith( ".dds" );
+			var isCompressed = /\.dds$/i.test( url_array[ 0 ] );
 
 			if ( isCompressed ) {
 
@@ -10769,7 +10909,7 @@ THREE.SceneLoader.prototype.parse = function ( json, callbackFinished, url ) {
 
 		} else {
 
-			var isCompressed = textureJSON.url.toLowerCase().endsWith( ".dds" );
+			var isCompressed = /\.dds$/i.test( textureJSON.url );
 			var fullUrl = get_url( textureJSON.url, data.urlBaseType );
 			var textureCallback = generateTextureCallback( 1 );
 
@@ -13233,6 +13373,8 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	console.log( 'THREE.CanvasRenderer', THREE.REVISION );
 
+	var smoothstep = THREE.Math.smoothstep;
+
 	parameters = parameters || {};
 
 	var _this = this,
@@ -13293,7 +13435,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 	_directionalLights = new THREE.Color(),
 	_pointLights = new THREE.Color(),
 
-	_pi2 = Math.PI * 2,
 	_vector3 = new THREE.Vector3(), // Needed for PointLight
 
 	_pixelMap, _pixelMapContext, _pixelMapImage, _pixelMapData,
@@ -13332,7 +13473,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		} else {
 
-			_context.setLineDash = function ( values ) {}
+			_context.setLineDash = function () {}
 
 		}
 
@@ -13525,7 +13666,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 				_v1 = element;
 				_v1.x *= _canvasWidthHalf; _v1.y *= _canvasHeightHalf;
 
-				renderParticle( _v1, element, material, scene );
+				renderParticle( _v1, element, material );
 
 			} else if ( element instanceof THREE.RenderableLine ) {
 
@@ -13538,7 +13679,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				if ( _clipBox.isIntersectionBox( _elemBox ) === true ) {
 
-					renderLine( _v1, _v2, element, material, scene );
+					renderLine( _v1, _v2, element, material );
 
 				}
 
@@ -13564,7 +13705,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				_elemBox.setFromPoints( [ _v1.positionScreen, _v2.positionScreen, _v3.positionScreen ] );
 
-				renderFace3( _v1, _v2, _v3, 0, 1, 2, element, material, scene );
+				renderFace3( _v1, _v2, _v3, 0, 1, 2, element, material );
 
 			} else if ( element instanceof THREE.RenderableFace4 ) {
 
@@ -13695,7 +13836,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderParticle( v1, element, material, scene ) {
+		function renderParticle( v1, element, material ) {
 
 			setOpacity( material.opacity );
 			setBlending( material.blending );
@@ -13807,7 +13948,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderLine( v1, v2, element, material, scene ) {
+		function renderLine( v1, v2, element, material ) {
 
 			setOpacity( material.opacity );
 			setBlending( material.blending );
@@ -13842,7 +13983,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderFace3( v1, v2, v3, uv1, uv2, uv3, element, material, scene ) {
+		function renderFace3( v1, v2, v3, uv1, uv2, uv3, element, material ) {
 
 			_this.info.render.vertices += 3;
 			_this.info.render.faces ++;
@@ -13968,17 +14109,9 @@ THREE.CanvasRenderer = function ( parameters ) {
 				_near = camera.near;
 				_far = camera.far;
 
-				var depth;
-
-				depth = 1 - smoothstep( v1.positionScreen.z * v1.positionScreen.w, _near, _far );
-				_color1.setRGB( depth, depth, depth );
-
-				depth = 1 - smoothstep( v2.positionScreen.z * v2.positionScreen.w, _near, _far )
-				_color2.setRGB( depth, depth, depth );
-
-				depth = 1 - smoothstep( v3.positionScreen.z * v3.positionScreen.w, _near, _far );
-				_color3.setRGB( depth, depth, depth );
-
+				_color1.r = _color1.g = _color1.b = 1 - smoothstep( v1.positionScreen.z * v1.positionScreen.w, _near, _far );
+				_color2.r = _color2.g = _color2.b = 1 - smoothstep( v2.positionScreen.z * v2.positionScreen.w, _near, _far );
+				_color3.r = _color3.g = _color3.b = 1 - smoothstep( v3.positionScreen.z * v3.positionScreen.w, _near, _far );
 				_color4.addColors( _color2, _color3 ).multiplyScalar( 0.5 );
 
 				_image = getGradientTexture( _color1, _color2, _color3, _color4 );
@@ -14022,7 +14155,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		}
 
-		function renderFace4( v1, v2, v3, v4, v5, v6, element, material, scene ) {
+		function renderFace4( v1, v2, v3, v4, v5, v6, element, material ) {
 
 			_this.info.render.vertices += 4;
 			_this.info.render.faces ++;
@@ -14034,8 +14167,8 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 				// Let renderFace3() handle this
 
-				renderFace3( v1, v2, v4, 0, 1, 3, element, material, scene );
-				renderFace3( v5, v3, v6, 1, 2, 3, element, material, scene );
+				renderFace3( v1, v2, v4, 0, 1, 3, element, material );
+				renderFace3( v5, v3, v6, 1, 2, 3, element, material );
 
 				return;
 
@@ -14396,13 +14529,6 @@ THREE.CanvasRenderer = function ( parameters ) {
 			_gradientMapContext.drawImage( _pixelMap, 0, 0 );
 
 			return _gradientMap;
-
-		}
-
-		function smoothstep( value, min, max ) {
-
-			var x = ( value - min ) / ( max - min );
-			return x * x * ( 3 - 2 * x );
 
 		}
 
@@ -21428,6 +21554,8 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				// render lines
 
+				setLineWidth( material.linewidth );
+
 				_gl.drawArrays( _gl.LINE_STRIP, 0, position.numItems / 3 );
 
 				_this.info.render.calls ++;
@@ -21929,7 +22057,7 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 						} else {
 
-							_vector3.copy( object.matrixWorld.getPosition() );
+							_vector3.getPositionFromMatrix( object.matrixWorld );
 							_vector3.applyProjection( _projScreenMatrix );
 
 							webglObject.z = _vector3.z;
@@ -23139,8 +23267,8 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				if ( p_uniforms.cameraPosition !== null ) {
 
-					var position = camera.matrixWorld.getPosition();
-					_gl.uniform3f( p_uniforms.cameraPosition, position.x, position.y, position.z );
+					_vector3.getPositionFromMatrix( camera.matrixWorld );
+					_gl.uniform3f( p_uniforms.cameraPosition, _vector3.x, _vector3.y, _vector3.z );
 
 				}
 
@@ -23741,8 +23869,9 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				if ( ! light.visible ) continue;
 
-				_direction.copy( light.matrixWorld.getPosition() );
-				_direction.sub( light.target.matrixWorld.getPosition() );
+				_direction.getPositionFromMatrix( light.matrixWorld );
+				_vector3.getPositionFromMatrix( light.target.matrixWorld );
+				_direction.sub( _vector3 );
 				_direction.normalize();
 
 				// skip lights with undefined direction
@@ -23786,11 +23915,11 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				}
 
-				position = light.matrixWorld.getPosition();
+				_vector3.getPositionFromMatrix( light.matrixWorld );
 
-				pointPositions[ pointOffset ]     = position.x;
-				pointPositions[ pointOffset + 1 ] = position.y;
-				pointPositions[ pointOffset + 2 ] = position.z;
+				pointPositions[ pointOffset ]     = _vector3.x;
+				pointPositions[ pointOffset + 1 ] = _vector3.y;
+				pointPositions[ pointOffset + 2 ] = _vector3.z;
 
 				pointDistances[ pointLength ] = distance;
 
@@ -23814,16 +23943,17 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				}
 
-				position = light.matrixWorld.getPosition();
+				_vector3.getPositionFromMatrix( light.matrixWorld );
 
-				spotPositions[ spotOffset ]     = position.x;
-				spotPositions[ spotOffset + 1 ] = position.y;
-				spotPositions[ spotOffset + 2 ] = position.z;
+				spotPositions[ spotOffset ]     = _vector3.x;
+				spotPositions[ spotOffset + 1 ] = _vector3.y;
+				spotPositions[ spotOffset + 2 ] = _vector3.z;
 
 				spotDistances[ spotLength ] = distance;
 
-				_direction.copy( position );
-				_direction.sub( light.target.matrixWorld.getPosition() );
+				_direction.copy( _vector3 );
+				_vector3.getPositionFromMatrix( light.target.matrixWorld );
+				_direction.sub( _vector3 );
 				_direction.normalize();
 
 				spotDirections[ spotOffset ]     = _direction.x;
@@ -23841,7 +23971,7 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				if ( ! light.visible ) continue;
 
-				_direction.copy( light.matrixWorld.getPosition() );
+				_direction.getPositionFromMatrix( light.matrixWorld );
 				_direction.normalize();
 
 				// skip lights with undefined direction
@@ -25467,28 +25597,6 @@ THREE.RenderableLine = function () {
 
 };
 /**
- * @author alteredq / http://alteredqualia.com/
- */
-
-THREE.ColorUtils = {
-
-	adjustHSV : function ( color, h, s, v ) {
-
-		var hsv = THREE.ColorUtils.__hsv;
-
-		color.getHSV( hsv );
-
-		hsv.h = THREE.Math.clamp( hsv.h + h, 0, 1 );
-		hsv.s = THREE.Math.clamp( hsv.s + s, 0, 1 );
-		hsv.v = THREE.Math.clamp( hsv.v + v, 0, 1 );
-
-		color.setHSV( hsv.h, hsv.s, hsv.v );
-
-	}
-
-};
-
-THREE.ColorUtils.__hsv = { h: 0, s: 0, v: 0 };/**
  * @author mrdoob / http://mrdoob.com/
  * @author alteredq / http://alteredqualia.com/
  */
@@ -26066,198 +26174,6 @@ THREE.GeometryUtils.random = THREE.Math.random16;
 THREE.GeometryUtils.__v1 = new THREE.Vector3();
 THREE.GeometryUtils.__v2 = new THREE.Vector3();
 /**
- * Compute and return the area of the face, using memoization for performance.
- *
- * @param faceId Id of the face in the .faces array of geometry
- * @param force  Optional, default to false. Forces re-calculus of area, ignoring ._area buffer
- * @return int Will return 0 if face is not Face3 or Face4
- */
-THREE.Geometry.prototype.getFaceArea = function ( faceId, force ) {
-
-  force = force || false;
-
-  var vA, vB, vC, vD, vertices = this.vertices, face = this.faces[faceId];
-
-  if ( !force && face._area !== undefined ) return face._area;
-
-  if ( face instanceof THREE.Face3 ) {
-
-    vA = vertices[ face.a ];
-    vB = vertices[ face.b ];
-    vC = vertices[ face.c ];
-
-    face._area = THREE.GeometryUtils.triangleArea( vA, vB, vC );
-
-  } else if ( face instanceof THREE.Face4 ) {
-
-    vA = vertices[ face.a ];
-    vB = vertices[ face.b ];
-    vC = vertices[ face.c ];
-    vD = vertices[ face.d ];
-
-    face._area1 = THREE.GeometryUtils.triangleArea( vA, vB, vD );
-    face._area2 = THREE.GeometryUtils.triangleArea( vB, vC, vD );
-
-    face._area = face._area1 + face._area2;
-
-  }
-
-  return face._area || 0;
-};
-
-
-/**
- * Some of these methods require the typeface'd helvetiker font available at
- * examples/fonts/helvetiker_regular.typeface.js
- *
- * @author Goutte http://github.com/Goutte
- */
-
-THREE.MeshUtils = {
-
-  /**
-   * Draw arrows on the normal of each face
-   * /!\ UNTESTED
-   *
-   * @param mesh
-   */
-  revealFacesNormals: function ( mesh ) {
-
-    if ( !mesh.geometry instanceof THREE.Geometry ) throw new Error( "Mesh without geometry" );
-
-    var l = mesh.geometry.faces.length;
-    if ( 1 > l ) throw 'Mesh must have at least one face';
-    mesh.geometry.faces.forEach( function ( face, i ) {
-      mesh.add( new THREE.ArrowHelper( face.normal, new THREE.Vector3( 0, 0, 0 ), mesh.geometry.getFaceArea( i, true ), 0xFF3399 ) );
-    } );
-
-  },
-
-
-  /**
-   * Requires the typeface'd helvetiker font
-   * TODO: make text face away from origin or face sum of vectors going from a neigbor vertice to this vertice
-   *
-   * @param mesh
-   */
-  revealVerticesIds: function ( mesh ) {
-
-    if ( !mesh.geometry instanceof THREE.Geometry ) throw new Error( "Mesh without geometry" );
-
-    mesh.geometry.vertices.forEach( function ( v, i ) {
-
-      var id = i.toString();
-      var textMesh = new THREE.Mesh( new THREE.TextGeometry( id, { size: 2, height: 0.5, curveSegments: 2, font: "helvetiker" } ) );
-      mesh.add( textMesh );
-      textMesh.position = v;
-
-    } );
-
-  },
-
-
-  /**
-   * Requires the typeface'd helvetiker font
-   * BUG: Breaks on some meshes (OBJ imported, for one)
-   *
-   * @param mesh
-   * @param scale
-   */
-  revealFacesIds: function ( mesh, scale ) {
-
-    if ( !mesh.geometry instanceof THREE.Geometry ) throw new Error( "Mesh without geometry" );
-
-    var id, textMesh, vertices = mesh.geometry.vertices, l = mesh.geometry.faces.length;
-    if ( 1 > l ) throw 'Mesh must have at least one face';
-
-    scale = scale || 1;
-
-    mesh.updateMatrixWorld();
-
-    mesh.geometry.faces.forEach( function ( face, i ) {
-
-      var size = Math.sqrt( mesh.geometry.getFaceArea( i, true ) ) / 3;
-
-      // Create the number geometry and mesh
-      id = i.toString();
-      textMesh = new THREE.Mesh(
-        new THREE.TextGeometry( id, {
-          size: 7 * scale * size,
-          height: scale * size,
-          curveSegments: 3,
-          font: "helvetiker"
-        } )
-      );
-
-      mesh.add( textMesh );
-
-      textMesh.applyMatrix( new THREE.Matrix4().makeTranslation(
-        face.normal.clone().multiplyScalar( face.centroid.length() )
-      ) );
-
-      textMesh.lookAt( textMesh.position.clone().multiplyScalar( 2 ) ); // look away from origin
-      textMesh.updateMatrixWorld();
-
-      var targetVertex = mesh.geometry.vertices[face.a].clone();
-
-      mesh.localToWorld( targetVertex );
-      textMesh.worldToLocal( targetVertex );
-
-      targetVertex.normalize();
-
-      var angle = Math.acos( new THREE.Vector3( 0, 1, 0 ).dot( targetVertex ) );
-      var cross = new THREE.Vector3( 0, 1, 0 ).cross( targetVertex );
-
-      textMesh.rotation.add( new THREE.Vector3( 0, 0, (cross.z < 0 ? -1 : 1) * angle ) );
-
-      textMesh.geometry.computeBoundingBox();
-      var max = textMesh.geometry.boundingBox.max;
-      var min = textMesh.geometry.boundingBox.min;
-      var off = new THREE.Vector3().subVectors( min, max ).divideScalar( 2 ).sub( min );
-      textMesh.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( off ) );
-
-      textMesh.updateMatrixWorld();
-
-      textMesh.add( new THREE.AxisHelper( mesh.geometry.getFaceArea( i, false ) ) );
-
-    } );
-
-  },
-
-
-  /**
-   * Creates children meshes for the bounding sphere and box if they are computed
-   *
-   * @param mesh
-   * @param detail Optional, default to 0. More will add polygons to the sphere.
-   */
-  revealBoundaries: function ( mesh, detail ) {
-
-    detail = detail || 0;
-    if ( !mesh.geometry instanceof THREE.Geometry ) throw new Error( "Mesh without geometry" );
-
-    var boundary = mesh.geometry.boundingSphere;
-    if ( boundary instanceof THREE.Sphere ) {
-      var sphere = new THREE.SphereGeometry( boundary.radius, (detail + 1) * 8, (detail + 1) * 6 );
-      sphere = new THREE.Mesh( sphere );
-      sphere.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( boundary.center ) );
-      mesh.add( sphere );
-    }
-
-    boundary = mesh.geometry.boundingBox;
-    if ( boundary instanceof THREE.Box3 ) {
-      var xyz = new THREE.Vector3().subVectors( boundary.max, boundary.min );
-      var box = new THREE.CubeGeometry( xyz.x, xyz.y, xyz.z );
-      box = new THREE.Mesh( box );
-      var off = new THREE.Vector3().addVectors( boundary.max, boundary.min ).divideScalar( 2 );
-      box.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( off ) );
-      mesh.add( box );
-    }
-
-  }
-
-
-};/**
  * @author alteredq / http://alteredqualia.com/
  * @author mrdoob / http://mrdoob.com/
  */
@@ -34920,7 +34836,9 @@ THREE.ShadowMapPlugin = function () {
 	_projScreenMatrix = new THREE.Matrix4(),
 
 	_min = new THREE.Vector3(),
-	_max = new THREE.Vector3();
+	_max = new THREE.Vector3(),
+
+	_matrixPosition = new THREE.Vector3();
 
 	this.init = function ( renderer ) {
 
@@ -35105,7 +35023,8 @@ THREE.ShadowMapPlugin = function () {
 			shadowCamera = light.shadowCamera;
 
 			shadowCamera.position.getPositionFromMatrix( light.matrixWorld );
-			shadowCamera.lookAt( light.target.matrixWorld.getPosition() );
+			_matrixPosition.getPositionFromMatrix( light.target.matrixWorld );
+			shadowCamera.lookAt( _matrixPosition );
 			shadowCamera.updateMatrixWorld();
 
 			shadowCamera.matrixWorldInverse.getInverse( shadowCamera.matrixWorld );
@@ -35905,437 +35824,6 @@ THREE.DepthPassPlugin = function () {
 };
 
 /**
- * Plugin for THREE.WebGLRenderer, to add as pre-plugin.
- *
- * Renders a background skymap behind the Scene
- * This aims to solve the problem of the camera's far constraint
- *
- * ¡ THIS IS A WORK IN PROGRESS !
- *
- * Usage example :
- * renderer.addPrePlugin(new THREE.SkySpherePlugin({
- *   mode: 'sphereImage',
- *   sphereImage: {
- *     imageSrc: 'textures/skymap/apocalyptic_room.jpg'
- *   }
- * }));
- *
- * Modes :
- *
- * - test : don't mind it, it should draw a big static polychromatic triangle behind the scene
- * - staticImage : draws a static image directly using shader (no modifications to the scene)
- * - sphereImage : adds a big SphereGeometrized mesh following the camera, of frustum's farthest plan radius,
- *                 and textured the way you want.
- *
- * Notes :
- *
- * If using an image texture, its width and height must both be a power of 2.
- * Powers of 2 : 1 2 4 8 16 32 64 128 256 1024 2048 4096 8192 16384 32768 65536
- *
- * The sphereImage mode adds a big mesh with a sphere geometry.
- * Ideally, it should not add anything to the scene, and render directly using shaders ; I spent a night trying, but to no avail.
- *
- * The current THREE.SphereGeometry UV mapping does not fill the image rectangle, which causes artifacts on poles on continuus textures.
- * Using an Icosahedron with a mapping similar to textures/skymap/example_ico_uv.jpg would probably be prettier.
- * Quadspheres are nice too.
- *
- * @author Goutte / http://github.com/Goutte
- *
- * @param {Object} options Optional, see defaultOptions below
- */
-THREE.SkySpherePlugin = function ( options ) {
-
-  var defaultOptions = {
-    mode: 'sphereImage', // test, staticImage, sphereImage
-    staticImage: {
-      imageSrc: 'textures/skymap/sky00.jpg'
-    },
-    sphereImage: {
-      imageSrc: 'textures/skymap/apocalyptic_room.jpg',
-      detail: 3, // more detail adds polygons to the geometry
-      radiusIfCameraHasNoFar: 1000,
-      materialOptions: {}
-    },
-    onLoad: function(){} // callback fired when images are loaded (¡ `this` may be anything !)
-  };
-
-  options = options || {};
-  options = mergeObjects( options, defaultOptions );
-
-
-  var _gl, _renderer, _precision, _program,
-      _skyTexture, _isTextureLoaded = false;
-
-
-  /**
-   * Called once by THREE.WebGLRenderer to initialize the plugin's variables
-   *
-   * @param {THREE.WebGLRenderer} renderer
-   */
-  this.init = function ( renderer ) {
-
-    if (! renderer instanceof THREE.WebGLRenderer) throw new Error('SkySphere only works with WebGL');
-
-    _gl = renderer.context;
-    _renderer = renderer;
-    _precision = renderer.getPrecision();
-
-    switch ( options.mode )
-    {
-      case 'test':
-        _renderer.autoClear = false; // otherwise it clears between the pre plugins and the scene
-        break;
-
-
-      case 'staticImage':
-
-        this.createProgramForMode(options.mode);
-
-        _renderer.autoClear = false; // otherwise it clears between the pre plugins and the scene
-
-        function handleLoadedTexture( texture ) {
-          _gl.bindTexture( _gl.TEXTURE_2D, texture );
-          //_gl.pixelStorei( _gl.UNPACK_FLIP_Y_WEBGL, true ); // todo: ask @WestLangley for guidance
-          _gl.texImage2D( _gl.TEXTURE_2D, 0, _gl.RGBA, _gl.RGBA, _gl.UNSIGNED_BYTE, texture.image );
-          _gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_MAG_FILTER, _gl.NEAREST );
-          _gl.texParameteri( _gl.TEXTURE_2D, _gl.TEXTURE_MIN_FILTER, _gl.NEAREST );
-          _gl.bindTexture( _gl.TEXTURE_2D, null );
-
-          _isTextureLoaded = true;
-          options.onLoad();
-        }
-
-        _skyTexture = _gl.createTexture();
-        _skyTexture.image = new Image();
-        _skyTexture.image.onload = function () { handleLoadedTexture( _skyTexture ) };
-        _skyTexture.image.src = options.staticImage.imageSrc;
-
-        this.initStaticImage();
-
-        break;
-
-      case 'sphereImage':
-        this.initSphereImage( renderer );
-        break;
-
-      default:
-        throw new Error("SkySphere has no '"+options.mode+"' mode");
-    }
-
-  };
-
-  this.createProgramForMode = function(mode) {
-    if ( this.shaders[mode] !== undefined ) {
-      _program = createProgram( this.shaders[options.mode]['vertex'], this.shaders[options.mode]['fragment'] );
-      _gl.useProgram( _program );
-    } else {
-      throw new Error("No GLSL shaders for mode '"+mode+"'");
-    }
-  };
-
-
-  /**
-   * Called on each render by THREE.WebGLRenderer
-   *
-   * @param scene
-   * @param camera
-   * @param viewportWidth
-   * @param viewportHeight
-   */
-  this.render = function ( scene, camera, viewportWidth, viewportHeight ) {
-
-    _gl.useProgram( _program );
-
-    switch ( options.mode )
-    {
-      case 'test':
-        this.renderTest( scene, camera, viewportWidth, viewportHeight );
-        break;
-
-      case 'staticImage':
-        if (_isTextureLoaded) this.renderStaticImage( scene, camera, viewportWidth, viewportHeight );
-        break;
-
-      case 'sphereImage':
-        this.renderSphereImage( scene, camera, viewportWidth, viewportHeight );
-        break;
-
-      default:
-        throw new Error("SkySphere has no '"+options.mode+"' mode");
-    }
-
-  };
-
-  // STATIC IMAGE //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  this.initStaticImage = function () {
-
-    _program.vertexPositionBuffer = _gl.createBuffer();
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
-    var vertices = [
-      -1.0, -1.0,
-       1.0,  1.0,
-      -1.0,  1.0,
-      -1.0, -1.0,
-       1.0, -1.0,
-       1.0,  1.0
-    ];
-    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( vertices ), _gl.STATIC_DRAW );
-    _program.vertexPositionBuffer.itemSize = 2;
-    _program.vertexPositionBuffer.numItems = vertices.length / _program.vertexPositionBuffer.itemSize;
-
-
-    _program.vertexUVBuffer = _gl.createBuffer();
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexUVBuffer );
-    var UVs = [
-      0.0, 1.0,
-      1.0, 0.0,
-      0.0, 0.0,
-      0.0, 1.0,
-      1.0, 1.0,
-      1.0, 0.0
-    ];
-    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( UVs ), _gl.STATIC_DRAW );
-    _program.vertexUVBuffer.itemSize = 2;
-    _program.vertexUVBuffer.numItems = UVs.length / _program.vertexUVBuffer.itemSize;
-
-
-    // Bind shaders vars
-
-    _program.vertexPositionAttribute = _gl.getAttribLocation( _program, "aPosition" );
-    _gl.enableVertexAttribArray( _program.vertexPositionAttribute );
-
-    _program.textureUVAttribute = _gl.getAttribLocation( _program, "aTextureUV" );
-    _gl.enableVertexAttribArray( _program.textureUVAttribute );
-
-    _program.samplerUniform = _gl.getUniformLocation( _program, "uSampler" );
-
-
-    attribPointersStaticImage();
-
-  };
-
-  this.renderStaticImage = function ( scene, camera, viewportWidth, viewportHeight ) {
-
-    attribPointersStaticImage();
-
-    _gl.activeTexture( _gl.TEXTURE0 );
-    _gl.bindTexture( _gl.TEXTURE_2D, _skyTexture );
-    _gl.uniform1i( _program.samplerUniform, 0 );
-
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
-    _gl.drawArrays( _gl.TRIANGLES, 0, _program.vertexPositionBuffer.numItems );
-
-  };
-
-  function attribPointersStaticImage () {
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexPositionBuffer );
-    _gl.vertexAttribPointer( _program.vertexPositionAttribute, _program.vertexPositionBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, _program.vertexUVBuffer );
-    _gl.vertexAttribPointer( _program.textureUVAttribute, _program.vertexUVBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
-  }
-
-  // SPHERE IMAGE //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  var _skyMesh, _sphereImageInitialized = false;
-
-  this.initSphereImage = function ( renderer ) {};
-
-  /**
-   * Obvious problem : if camera.far changes after initialization, we're screwed
-   *
-   * @param {THREE.Scene}  scene
-   * @param {THREE.Camera} camera
-   * @param viewportWidth
-   * @param viewportHeight
-   */
-  this.renderSphereImage = function ( scene, camera, viewportWidth, viewportHeight ) {
-
-    if ( ! _sphereImageInitialized ) {
-
-      _sphereImageInitialized = true;
-
-      var radius = camera.far || options.sphereImage.radiusIfCameraHasNoFar;
-      var detail = options.sphereImage.detail;
-
-      var materialOptions = options.sphereImage.materialOptions || {};
-
-      if ( ! materialOptions.map ) {
-        materialOptions.map = THREE.ImageUtils.loadTexture( options.sphereImage.imageSrc, new THREE.UVMapping(), options.onLoad );
-      }
-
-      _skyMesh = new THREE.Mesh(
-        new THREE.SphereGeometry( radius, 8 * detail, 6 * detail ),
-        new THREE.MeshBasicMaterial( materialOptions )
-      );
-      _skyMesh.scale.x = -1; // will show material inside of geometry
-      _skyMesh.frustumCulled = false;
-
-      scene.add( _skyMesh );
-
-    }
-
-    // make sure the skysphere does not translate in the camera's referential
-    _skyMesh.position = camera.matrixWorld.getPosition();
-    _skyMesh.updateMatrixWorld();
-
-  };
-
-
-
-  // TEST //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  this.renderTest = function ( scene, camera, viewportWidth, viewportHeight ) {
-
-    var vertices = [
-      -0.5, -0.5,
-      0.5, -0.5,
-      0.0, 0.5
-    ];
-
-    var vertexPosBuffer = _gl.createBuffer();
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, vertexPosBuffer );
-    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( vertices ), _gl.STATIC_DRAW );
-
-    var colors = [
-      1.0, 0.0, 0.0, 1.0,
-      0.0, 1.0, 0.0, 1.0,
-      0.0, 0.0, 1.0, 1.0
-    ];
-    var triangleVertexColorBuffer = _gl.createBuffer();
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, triangleVertexColorBuffer );
-    _gl.bufferData( _gl.ARRAY_BUFFER, new Float32Array( colors ), _gl.STATIC_DRAW );
-    triangleVertexColorBuffer.itemSize = 4;
-    triangleVertexColorBuffer.numItems = 3;
-
-    _program.vertexPosAttrib = _gl.getAttribLocation( _program, 'aPosition' );
-    _gl.enableVertexAttribArray( _program.vertexPosAttrib );
-
-    _program.vertexColorAttrib = _gl.getAttribLocation( _program, 'aColor' );
-    _gl.enableVertexAttribArray( _program.vertexColorAttrib );
-
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, vertexPosBuffer );
-    _gl.vertexAttribPointer( _program.vertexPosAttrib, 2, _gl.FLOAT, false, 0, 0 );
-
-    _gl.bindBuffer( _gl.ARRAY_BUFFER, triangleVertexColorBuffer );
-    _gl.vertexAttribPointer( _program.vertexColorAttrib, triangleVertexColorBuffer.itemSize, _gl.FLOAT, false, 0, 0 );
-
-    _gl.drawArrays( _gl.TRIANGLES, 0, 3 );
-
-  };
-
-
-  /**
-   * GLSL Shaders for each mode
-   * We HAVE GOT to find another way to host these
-   * Separate files would be nice but would require waiting for them to load => doable, but may be too expensive
-   *
-   * @type {Object}
-   */
-  this.shaders = {
-    'test': {
-      'vertex': [
-        'attribute vec2 aPosition;'
-        , 'attribute vec4 aColor;'
-
-        , 'varying   vec4 vColor;'
-
-        , 'void main(){'
-        , '  gl_Position = vec4(aPosition, 1.0, 1.0);'
-        , '  vColor = aColor;'
-        , '}'
-      ].join( "\n" ),
-      'fragment': [
-        'precision mediump float;'
-
-        , 'varying   vec4 vColor;'
-
-        , 'void main(){'
-        , '  gl_FragColor = vColor;'
-        , '}'
-      ].join( "\n" )
-    },
-
-    'staticImage': {
-      'vertex': [
-        'attribute vec2 aPosition;'
-        , 'attribute vec2 aTextureUV;'
-
-        , 'varying   vec2 vTextureUV;'
-
-        , 'void main(){'
-        , '  gl_Position = vec4(aPosition, 1.0, 1.0);'
-        , '  vTextureUV = aTextureUV;'
-        , '}'
-      ].join( "\n" ),
-      'fragment': [
-        'precision mediump   float;'
-
-        , 'uniform   sampler2D uSampler;'
-
-        , 'varying   vec2      vTextureUV;'
-
-        , 'void main(){'
-        , '  gl_FragColor = texture2D(uSampler, vTextureUV);'
-        , '}'
-      ].join( "\n" )
-    }
-  };
-
-
-  // TODO: find the THREE utils that manage this, to dry the code up
-
-  /**
-   * Merge addedObject into destinationObject and return the latter
-   * fixme: https://github.com/mootools/mootools-core/blob/master/Source/Core/Core.js#L362
-   *
-   * @param destinationObject
-   * @param addedObject
-   * @return {*}
-   */
-  function mergeObjects( destinationObject, addedObject ) {
-    for ( var p in addedObject ) {
-      try {
-        // Property in destinationObject set; update its value.
-        if ( addedObject[p].constructor == Object ) {
-          destinationObject[p] = mergeObjects( destinationObject[p], addedObject[p] );
-        } else {
-          destinationObject[p] = addedObject[p];
-        }
-      } catch ( e ) {
-        destinationObject[p] = addedObject[p]; // Property in destinationObject not set; create it and set its value.
-      }
-    }
-
-    return destinationObject;
-  }
-
-  function createShader( str, type ) {
-    var shader = _gl.createShader( type );
-    _gl.shaderSource( shader, str );
-    _gl.compileShader( shader );
-    if ( !_gl.getShaderParameter( shader, _gl.COMPILE_STATUS ) ) {
-      throw _gl.getShaderInfoLog( shader );
-    }
-    return shader;
-  }
-
-  function createProgram( vstr, fstr ) {
-    var program = _gl.createProgram();
-    var vshader = createShader( vstr, _gl.VERTEX_SHADER );
-    var fshader = createShader( fstr, _gl.FRAGMENT_SHADER );
-    _gl.attachShader( program, vshader );
-    _gl.attachShader( program, fshader );
-    _gl.linkProgram( program );
-    if ( !_gl.getProgramParameter( program, _gl.LINK_STATUS ) ) {
-      throw _gl.getProgramInfoLog( program );
-    }
-    return program;
-  }
-
-  //////////////////////////////////////////////////////////////////
-
-};/**
  * @author mikael emtinger / http://gomo.se/
  *
  */
