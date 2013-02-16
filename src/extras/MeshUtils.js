@@ -1,33 +1,3 @@
-
-/**
- * Sets this matrix to be a translation matrix of Vector v
- *
- * @param v THREE.Vector3
- * @param y Deprecated
- * @param z Deprecated
- * @return THREE.Matrix4
- */
-THREE.Matrix4.prototype.makeTranslation = function ( v, y, z ) {
-
-  if ( v instanceof THREE.Vector3 ) {
-    z = v.z;
-    y = v.y;
-    v = v.x;
-  } else {
-    console.warn( "DEPRECATED: Use makeTranslation( Vector3 ) instead" );
-  }
-
-  this.set(
-    1, 0, 0, v,
-    0, 1, 0, y,
-    0, 0, 1, z,
-    0, 0, 0, 1
-  );
-
-  return this;
-
-};
-
 /**
  * Compute and return the area of the face, using memoization for performance.
  *
