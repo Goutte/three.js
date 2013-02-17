@@ -45,7 +45,7 @@ THREE.SkySpherePlugin = function ( options ) {
       imageSrc: 'textures/skymap/sky00.jpg'
     },
     sphereImage: {
-      imageSrc: 'textures/skymap/apocalyptic_room.jpg',
+      imageSrc: 'textures/skymap/blue.jpg',
       detail: 3, // more detail adds polygons to the geometry
       radiusIfCameraHasNoFar: 1000,
       materialOptions: {}
@@ -54,8 +54,7 @@ THREE.SkySpherePlugin = function ( options ) {
   };
 
   options = options || {};
-  options = mergeObjects( options, defaultOptions );
-
+  options = mergeObjects( defaultOptions, options );
 
   var _gl, _renderer, _precision, _program,
       _skyTexture, _isTextureLoaded = false;

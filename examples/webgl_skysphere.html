@@ -29,7 +29,6 @@
 			#stats { position: absolute; top:0; left: 0 }
 			#stats #fps { background: transparent !important }
 			#stats #fps #fpsText { color: #777 !important }
-			/*#stats #fps #fpsGraph { display: none }*/
 		</style>
 	</head>
 
@@ -67,39 +66,12 @@
 
 		function init() {
 
-			camera = new THREE.PerspectiveCamera( 25, WIDTH / HEIGHT, 1, 10000 );
+			camera = new THREE.PerspectiveCamera( 60, WIDTH / HEIGHT, 1, 10000 );
 			camera.position.z = 350;
 
 			controls = new THREE.TrackballControls( camera );
 
 			scene = new THREE.Scene();
-
-			//
-
-//			attributes = {
-//
-//				displacement: {	type: 'v3', value: [] },
-//				customColor:  {	type: 'c', value: [] }
-//
-//			};
-//
-//			uniforms = {
-//
-//				amplitude: { type: "f", value: 0.0 }
-//
-//			};
-
-//			var shaderMaterial = new THREE.ShaderMaterial( {
-//
-//				uniforms: 		uniforms,
-//				attributes:     attributes,
-//				vertexShader:   document.getElementById( 'vertexshader' ).textContent,
-//				fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
-//				shading: 		THREE.FlatShading,
-//				side: 			THREE.DoubleSide
-//
-//			});
-
 
 			var geometry = new THREE.TextGeometry( "THREE.JS", {
 
@@ -117,69 +89,10 @@
 
 			});
 
-//			geometry.dynamic = true;
-
 			THREE.GeometryUtils.center( geometry );
 
-//			var tessellateModifier = new THREE.TessellateModifier( 4 );
-//
-//			for ( var i = 0; i < 6; i ++ ) {
-//
-//				tessellateModifier.modify( geometry );
-//
-//			}
 
-//			var explodeModifier = new THREE.ExplodeModifier();
-//			explodeModifier.modify( geometry );
-
-//			var vertices = geometry.vertices;
-
-//			var colors = attributes.customColor.value;
-//			var displacement = attributes.displacement.value;
-
-//			var h, d, x, y, z;
-//			var nv, v = 0;
-
-//			for( var f = 0; f < geometry.faces.length; f ++ ) {
-//
-//				var face = geometry.faces[ f ];
-//
-//				if ( face instanceof THREE.Face3 ) {
-//
-//					nv = 3;
-//
-//				} else {
-//
-//					nv = 4;
-//
-//				}
-//
-//				h = 0.15 * Math.random();
-//				s = 0.7 * Math.random();
-//
-//				d = 10 * ( 0.5 - Math.random() );
-//
-//				x = 2 * ( 0.5 - Math.random() );
-//				y = 2 * ( 0.5 - Math.random() );
-//				z = 2 * ( 0.5 - Math.random() );
-//
-//				for ( var i = 0; i < nv; i ++ ) {
-//
-//					colors[ v ] = new THREE.Color();
-//					displacement[ v ] = new THREE.Vector3();
-//
-//					colors[ v ].setHSV( h, s, 1 );
-//					colors[ v ].convertGammaToLinear();
-//
-//					displacement[ v ].set( x, y, z );
-//
-//					v += 1;
-//
-//				}
-//
-//			}
-
-			console.log( "faces", geometry.faces.length );
+      geometry = new THREE.IcosahedronGeometry(70, 5);
 
       mesh = new THREE.Mesh( geometry );
       scene.add( mesh );
@@ -188,17 +101,24 @@
 
 			renderer.setSize( WIDTH, HEIGHT );
 
-      renderer.addPrePlugin(new THREE.SkySpherePlugin({}));
-
-
+      renderer.addPrePlugin( new THREE.SkySpherePlugin( {
+        mode: 'sphereImage',
+        sphereImage: {
+          imageSrc: 'textures/skymap/blue.jpg',
+          detail: 5
+        },
+        onLoad: function () { console.log( 'skymap image loaded !' ) }
+      } ) );
 
 			var container = document.getElementById( 'container' );
 			container.appendChild( renderer.domElement );
 
+      // Stats
+
 			stats = new Stats();
 			container.appendChild( stats.domElement );
 
-			//
+      // Events
 
 			window.addEventListener( 'resize', onWindowResize, false );
 
@@ -224,11 +144,8 @@
 
 		function render() {
 
-			var time = Date.now() * 0.001;
-
-//			uniforms.amplitude.value = 0.125 * Math.sin( time * 0.5 );
-
 			controls.update();
+
 			renderer.render( scene, camera );
 
 		}
