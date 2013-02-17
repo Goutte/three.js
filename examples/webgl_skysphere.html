@@ -56,7 +56,7 @@
 
 		var renderer, scene, camera, controls, stats;
 
-		var mesh, uniforms, attributes;
+		var geometry, mesh;
 
 		var WIDTH = window.innerWidth,
 			HEIGHT = window.innerHeight;
@@ -73,26 +73,26 @@
 
 			scene = new THREE.Scene();
 
-			var geometry = new THREE.TextGeometry( "THREE.JS", {
+//			var geometry = new THREE.TextGeometry( "THREE.JS", {
+//
+//				size: 40,
+//				height: 5,
+//				curveSegments: 3,
+//
+//				font: "helvetiker",
+//				weight: "bold",
+//				style: "normal",
+//
+//				bevelThickness: 2,
+//				bevelSize: 1,
+//				bevelEnabled: true
+//
+//			});
 
-				size: 40,
-				height: 5,
-				curveSegments: 3,
-
-				font: "helvetiker",
-				weight: "bold",
-				style: "normal",
-
-				bevelThickness: 2,
-				bevelSize: 1,
-				bevelEnabled: true
-
-			});
-
-			THREE.GeometryUtils.center( geometry );
+//			THREE.GeometryUtils.center( geometry );
 
 
-      geometry = new THREE.IcosahedronGeometry(70, 5);
+      geometry = new THREE.IcosahedronGeometry(70, 1);
 
       mesh = new THREE.Mesh( geometry );
       scene.add( mesh );

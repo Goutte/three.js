@@ -269,7 +269,7 @@ THREE.SkySpherePlugin = function ( options ) {
     }
 
     // make sure the skysphere does not translate in the camera's referential
-    _skyMesh.position = camera.matrixWorld.getPosition();
+    _skyMesh.position.getPositionFromMatrix( camera.matrixWorld );
     _skyMesh.updateMatrixWorld();
 
   };
