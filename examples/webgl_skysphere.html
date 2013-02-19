@@ -104,8 +104,8 @@
       light = new THREE.PointLight(0x8dffff, 0.75, 1000);
       scene.add(light);
 
-      geometry = new THREE.GeodesicGeometry(100, 3);
-      mesh = new THREE.Mesh( geometry, new THREE.MeshPhongMaterial( { ambient: 0x555555, color: 0x555555, specular: 0xffffff, shininess: 3, shading: THREE.FlatShading }  ) );
+      geometry = new THREE.GeodesicGeometry(100, 5);
+      mesh = new THREE.Mesh( geometry, new THREE.MeshPhongMaterial( { ambient: 0x555555, color: 0x555555, specular: 0xffffff, shininess: 3, shading: THREE.NoShading }  ) );
       scene.add( mesh );
 
 
@@ -138,6 +138,11 @@
       // Events
 
 			window.addEventListener( 'resize', onWindowResize, false );
+
+
+      // Loader
+
+      console.log('loaded!');
 
 		}
 

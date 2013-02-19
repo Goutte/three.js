@@ -216,8 +216,12 @@ THREE.Geometry.prototype.sortFaces3ByAdjacency = function ( faces ) {
 
 /**
  * http://en.wikipedia.org/wiki/Geodesic_grid
+ * It is made of 12 pentagons and, if detail > 1, ( ( 10 * ( 4 ^ detail ) - 30 ) / 3 ) hexagons
+ * It looks like a golf ball at detail = 3
  *
- * ¡ insanely slow !
+ * It builds the geometry by computing the Icosahedron's dual polyhedron.
+ *
+ * ¡ very slow !
  *
  * @author Goutte / https://github.com/Goutte
  *
@@ -228,14 +232,12 @@ THREE.GeodesicGeometry = function ( radius, detail ) {
 
   THREE.IcosahedronGeometry.call( this, radius, detail );
 
-  this.hexagonalFaces = [];
-  this.pentagonalFaces = [];
-
+  this.hexagonalFaces = []; // holds the hexagonal meta-faces
+  this.pentagonalFaces = []; // holds the 12 pentagonal meta-faces
   this.centerVertices = this.vertices.slice( 0 ); // vertices at the center of the hexagonal or pentagonal faces
 
   var newVertices = this.vertices.slice( 0 );
   var newFaces = [];
-  var vertex;
 
   // tmp vars
   var
@@ -250,7 +252,8 @@ THREE.GeodesicGeometry = function ( radius, detail ) {
 
   // compute new vertices
   for ( i = 0, l = this.faces.length; i < l; i++ ) {
-    newVertices.push( this.faces[ i ].centroid.setLength( radius ) );
+    this.faces[ i ]._centroidVertexIndex = newVertices.length;
+    newVertices.push( new THREE.Vector3().copy( this.faces[ i ].centroid ).setLength( radius ) );
   }
 
   // compute new faces
@@ -261,12 +264,13 @@ THREE.GeodesicGeometry = function ( radius, detail ) {
     //this.sortFaces3ByAdjacency( adjacentFaces );
     var afl = adjacentFaces.length;
 
+
     for ( j = 0; j < afl; j++ ) {
       faceA = adjacentFaces[j];
       faceB = adjacentFaces[(j + 1) % afl];
       a = i;
-      b = newVertices.indexOf( faceA.centroid );
-      c = newVertices.indexOf( faceB.centroid );
+      b = faceA._centroidVertexIndex;
+      c = faceB._centroidVertexIndex;
 
       if ( a === -1 || b === -1 || c === -1 ) throw new Error( 'Houston, we have a problem !' );
 
